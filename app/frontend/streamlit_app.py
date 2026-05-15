@@ -64,7 +64,7 @@ st.sidebar.divider()
 st.sidebar.markdown(
     """
     **Built by Firas Armoush**  
-    [GitHub](https://github.com/F-Armoush)
+    [GitHub](https://github.com/Firas-Armoush-ai)
     """
 )
 # =========================================================

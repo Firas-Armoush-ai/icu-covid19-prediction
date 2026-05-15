@@ -1,4 +1,12 @@
-# ICU Prediction for COVID-19 Patients (Early-Stage Machine Learning Model)
+# ICU Prediction for COVID-19 Patients (Early-Stage Machine Learning System)
+
+🚀 **Live Demo:**
+https://icu-covid19-prediction.onrender.com/
+
+📘 **API Documentation:**
+https://icu-covid19-prediction.onrender.com/docs
+
+---
 
 ## Overview
 
@@ -11,7 +19,7 @@ The project evolved from exploratory notebook experimentation into a modular, re
 * FastAPI inference backend
 * Streamlit interactive frontend
 * Dockerized deployment architecture
-* Cloud deployment readiness
+* Cloud deployment on Render
 
 The objective is to support early risk identification and clinically realistic ICU prediction workflows.
 
@@ -182,12 +190,12 @@ The best-performing model is automatically selected, versioned, and saved during
 
 ## Deployment Architecture
 
-The project was extended into a deployable end-to-end ML application using:
+The application was extended into a deployable end-to-end ML system using:
 
 * FastAPI backend
 * Streamlit frontend
 * Docker containerization
-* Render cloud deployment architecture
+* Render cloud deployment
 
 ### Backend
 
@@ -208,7 +216,7 @@ The Streamlit frontend provides:
 * Risk-level interpretation
 * Deployment-safe API configuration
 
-### Inference Architecture
+### Inference Flow
 
 ```text
 User Input
@@ -246,6 +254,21 @@ inside a single deployment-ready environment.
 
 ---
 
+## Cloud Deployment
+
+The application is publicly deployed on Render using a Docker-based deployment workflow.
+
+Deployment stack:
+
+* Render
+* Docker
+* FastAPI
+* Streamlit
+
+GitHub integration enables automatic redeployment on every push to the `main` branch.
+
+---
+
 ## Project Structure
 
 ```text
@@ -271,11 +294,7 @@ icu-covid19-prediction/
 │   └── plots.py
 ├── models/
 ├── reports/
-│   ├── figures/
-│   ├── evaluation_<timestamp>.md
-│   └── project_summary.md
 ├── results/
-│   └── metrics_<timestamp>.json
 ├── Dockerfile
 ├── .dockerignore
 ├── start.sh
@@ -287,39 +306,30 @@ icu-covid19-prediction/
 
 ---
 
-## How to Run
+## Local Development
 
-### 1. Clone the repository
+### Clone repository
 
 ```bash
-git clone https://github.com/F-Armoush/icu-covid19-prediction.git
+git clone git@github-ai:Firas-Armoush-ai/icu-covid19-prediction.git
 cd icu-covid19-prediction
 ```
 
-### 2. Install dependencies
+### Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Run the ML training pipeline
+### Run ML training pipeline
 
 ```bash
 python run.py
 ```
 
-The pipeline will:
-
-* Train all models
-* Evaluate performance
-* Select the best model automatically
-* Save the trained model
-* Save evaluation metrics
-* Generate evaluation reports and figures
-
 ---
 
-## Run the Deployment Stack Locally
+## Run Application Locally
 
 ### Run FastAPI backend
 
@@ -336,28 +346,22 @@ streamlit run app/frontend/streamlit_app.py
 ### Open locally
 
 Frontend:
-
-```text
 http://localhost:8501
-```
 
-API documentation:
-
-```text
+API docs:
 http://127.0.0.1:8000/docs
-```
 
 ---
 
 ## Docker Usage
 
-### Build Docker image
+### Build image
 
 ```bash
 docker build -t icu-prediction-app .
 ```
 
-### Run Docker container
+### Run container
 
 ```bash
 docker run -p 8501:8501 -p 8000:8000 icu-prediction-app
@@ -375,8 +379,6 @@ CC BY-NC 4.0
 
 This repository does not claim ownership of the original dataset.
 
-Dataset attribution remains with the original authors/providers.
-
 ---
 
 ## Important Note About Inputs
@@ -391,25 +393,38 @@ Therefore:
 
 ---
 
-## Key Takeaways and Next Steps
+## Tech Stack
 
-### Key Takeaways
+### Machine Learning
 
-* Early-stage ICU prediction is feasible using limited clinical data when temporal structure is handled correctly
-* Restricting analysis to the first observation window (0–2 hours) is critical to prevent temporal leakage
-* Tree-based models outperformed linear models on this dataset
-* Proper training/inference schema consistency is essential for deployment-safe ML systems
-* End-to-end ML deployment requires coordination between modeling, APIs, frontend systems, and infrastructure
+* Python
+* Pandas
+* NumPy
+* Scikit-learn
+* XGBoost
 
-### Potential Future Improvements
+### Backend
 
-* Hyperparameter optimization
-* Cross-validation
-* Probability calibration
-* External validation on additional patient cohorts
-* Authentication and monitoring layers
-* CI/CD automation
-* Multi-container orchestration
-* Cloud model monitoring
+* FastAPI
+* Uvicorn
+
+### Frontend
+
+* Streamlit
+
+### Infrastructure
+
+* Docker
+* Render
+
+---
+
+## Author
+
+**Firas Armoush**
+AI/ML Engineering Portfolio
+
+GitHub: https://github.com/Firas-Armoush-ai
+Email: [firas.armoush.ai@gmail.com](mailto:firas.armoush.ai@gmail.com)
 
 ---
