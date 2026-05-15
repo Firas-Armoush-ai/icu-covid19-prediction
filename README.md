@@ -422,7 +422,7 @@ Therefore:
 ## Author
 
 **Firas Armoush**
-AI/ML Engineering Portfolio
+AI / Machine Learning Engineer
 
 GitHub: https://github.com/Firas-Armoush-ai
 Email: [firas.armoush.ai@gmail.com](mailto:firas.armoush.ai@gmail.com)
