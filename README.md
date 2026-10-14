@@ -1,5 +1,7 @@
 # ICU Prediction for COVID-19 Patients (Early-Stage Machine Learning System)
 
+[![tests](https://github.com/Firas-Armoush-ai/icu-covid19-prediction/actions/workflows/tests.yml/badge.svg)](https://github.com/Firas-Armoush-ai/icu-covid19-prediction/actions/workflows/tests.yml)
+
 🚀 **Live Demo:**
 https://icu-covid19-prediction.onrender.com/
 
@@ -14,12 +16,12 @@ This project develops an end-to-end machine learning system to predict whether a
 
 The project evolved from exploratory notebook experimentation into a modular, reproducible, deployment-ready ML application featuring:
 
-* Leakage-safe preprocessing
-* Reusable ML pipelines
-* FastAPI inference backend
-* Streamlit interactive frontend
-* Dockerized deployment architecture
-* Cloud deployment on Render
+* Leakage-safe, patient-level dataset built in code
+* Repeated cross-validation, probability calibration and a recall-targeted decision threshold
+* A single, untouched test set with bootstrap confidence intervals
+* FastAPI inference backend and Streamlit dashboard
+* Tests and CI (GitHub Actions)
+* Dockerized deployment on Render
 
 The objective is to support early risk identification and clinically realistic ICU prediction workflows.
 
@@ -123,79 +125,118 @@ The preprocessing workflow was implemented using reusable Scikit-learn pipelines
 
 ---
 
-## Modeling
+## Modeling and Evaluation
 
-The following models were evaluated:
+### Candidate models
 
 * Logistic Regression (baseline)
 * Random Forest
 * XGBoost
 
-All models were trained using a stratified 80/20 train-test split.
+Each model uses library defaults (no hyperparameter tuning) and is evaluated both as it is and wrapped in **sigmoid (Platt) calibration**.
+
+### Evaluation design
+
+1. **Fixed hold-out split.** 80/20 stratified split: 282 training patients (130 ICU), 71 test patients (33 ICU). The test set is not used until the very end.
+2. **Model comparison on the training split only.** Repeated stratified 5-fold cross-validation, 10 repeats (50 folds). Every fold refits the whole pipeline, including imputation, scaling, encoding, the missing-column filter and calibration, so nothing is learned from validation rows. Script: `python -m src.cross_validate`; full report: [`reports/cv_report.md`](reports/cv_report.md).
+3. **Decision threshold from a recall target.** Missed ICU cases matter most, so the threshold is the highest one that reaches **90% recall** on out-of-fold predictions (chosen per CV repeat; median used): **0.352**.
+4. **Calibration check.** Brier score, calibration slope and reliability curves on out-of-fold predictions.
+5. **One test-set evaluation.** The final model and threshold were committed before the test set was used, then evaluated once, with 95% bootstrap intervals. Script: `python run.py`; report: [`reports/evaluation_test.md`](reports/evaluation_test.md).
 
 ---
 
 ## Results
 
-| Model         | Accuracy   | Precision | Recall     | F1         | ROC-AUC    |
-| ------------- | ---------- | --------- | ---------- | ---------- | ---------- |
-| logistic      | 0.6883     | 0.6829    | 0.7179     | 0.7000     | 0.6920     |
-| random_forest | **0.7013** | 0.6667    | **0.8205** | **0.7356** | 0.7203     |
-| xgboost       | 0.6494     | 0.6304    | 0.7436     | 0.6824     | **0.7379** |
+### Cross-validation (training split, 50 folds, mean ± SD across folds)
+
+| Model | ROC-AUC | PR-AUC | Brier score | Calibration slope |
+| --- | --- | --- | --- | --- |
+| logistic | 0.680 ± 0.079 | 0.666 ± 0.084 | 0.248 ± 0.008 | 0.14 ± 0.03 |
+| random_forest | 0.686 ± 0.063 | 0.619 ± 0.073 | 0.235 ± 0.009 | 0.24 ± 0.07 |
+| xgboost | 0.695 ± 0.070 | 0.651 ± 0.077 | 0.252 ± 0.012 | 0.31 ± 0.03 |
+| logistic+sigmoid | 0.667 ± 0.083 | 0.653 ± 0.086 | 0.236 ± 0.003 | 1.14 ± 0.32 |
+| **random_forest+sigmoid** (final) | 0.695 ± 0.064 | 0.627 ± 0.073 | 0.225 ± 0.004 | 1.17 ± 0.22 |
+| xgboost+sigmoid | 0.709 ± 0.067 | 0.661 ± 0.078 | 0.222 ± 0.004 | 1.32 ± 0.25 |
+
+* **Discrimination is similar across models.** The differences in ROC-AUC are smaller than the fold-to-fold spread.
+* **Uncalibrated models are badly overconfident.** Calibration slopes of 0.14–0.31 (ideal: 1) and Brier scores no better than always predicting the ICU rate (0.248). Sigmoid calibration fixes this.
+
+What the 90% recall target costs (final model, out-of-fold):
+
+| Recall target | Threshold | Precision | Specificity | Patients flagged |
+| --- | --- | --- | --- | --- |
+| 0.80 | 0.412 | 0.583 | 0.509 | 63% |
+| 0.85 | 0.377 | 0.554 | 0.412 | 71% |
+| **0.90** | **0.352** | **0.539** | **0.340** | **77%** |
+| 0.95 | 0.278 | 0.485 | 0.132 | 91% |
+
+Flagging every patient would give precision 0.461.
+
+### Held-out test set (final model, threshold 0.352)
+
+71 patients, 33 admitted to ICU. 95% intervals from 2,000 bootstrap resamples.
+
+| Metric | Test set | 95% interval | Cross-validation |
+| --- | --- | --- | --- |
+| ROC-AUC | 0.643 | 0.502 – 0.765 | 0.695 |
+| PR-AUC | 0.592 | 0.441 – 0.767 | 0.627 |
+| Brier score | 0.236 | 0.205 – 0.272 | 0.225 |
+| Recall | 0.818 | 0.667 – 0.938 | 0.900 |
+| Precision | 0.519 | 0.383 – 0.655 | 0.539 |
+| Specificity | 0.342 | 0.200 – 0.500 | 0.340 |
+| F1 | 0.635 | 0.507 – 0.739 | — |
+
+At the threshold the model caught **27 of 33** ICU patients, missed 6, and flagged 52 of 71 patients (73%). For reference, the Brier score of always predicting the test set's ICU rate is 0.249.
+
+**Reading these results:** the test results agree with cross-validation within their (wide) intervals, at the lower end. With 71 test patients, the ROC-AUC interval reaches down to about 0.5. Data from the first two hours carries limited signal: the model is useful as a cautious screen that rules out about a third of patients who will not need ICU, not as a confident predictor.
+
+> Earlier versions of this README reported a test ROC-AUC of 0.72 and recall of 0.82 at a 0.5 cut-off. Those figures came from a dataset that included 32 patients already in ICU during the 0–2 hour window (see [Final Modeling Dataset](#final-modeling-dataset)), and the model was chosen on the same test set it was scored on.
 
 ---
 
 ## Model Selection
 
-Random Forest was selected as the final model based on its overall balance between recall and F1-score, which are especially important for this clinical use case.
+**Random Forest with sigmoid calibration**, chosen from cross-validation before the test set was used:
 
-### Selection Rationale
+* Discrimination is statistically indistinguishable across candidates, so it does not decide the choice
+* Best calibration slope among the calibrated models (1.17), with a Brier score close to the best (0.225 vs 0.222)
+* Precision and specificity at each recall target are level with XGBoost + sigmoid
+* Needs only scikit-learn at inference time
 
-* Highest F1-score across all evaluated models
-* Highest recall (~0.82), reducing false negatives
-* Stable overall performance across metrics
-* Strong performance on tabular clinical data
-
-Although XGBoost achieved a slightly higher ROC-AUC, Random Forest provided the most suitable trade-off for early ICU risk prediction.
-
-From a clinical perspective, minimizing false negatives (missed ICU cases) is a priority.
+Choosing among six candidates on the same cross-validation slightly flatters the winner; the single test-set evaluation is the unbiased check.
 
 ---
 
 ## Key Insights
 
-The model identified clinically meaningful predictors associated with ICU admission risk, including:
+What the model relies on most (impurity-based importances, summed per measurement; see [`reports/evaluation_test.md`](reports/evaluation_test.md)):
 
-* Age
-* Lymphocyte levels
-* Urea
+* Age (percentile group and over-65 flag)
+* Gender
+* Lymphocytes
 * C-reactive protein (PCR)
 * Platelets
-* Sodium levels
+* Urea
+* Neutrophils
 
-These findings align with known indicators of COVID-19 severity.
+These are associations the model uses, not causal effects; they are consistent with commonly reported markers of COVID-19 severity.
+
+Two data findings shaped the work:
+
+* **32 patients were already in ICU during the first window.** Their measurements may have been taken after admission, so they were excluded.
+* **At 0–2 hours, each lab is effectively one value.** Its MEAN, MEDIAN, MIN and MAX columns are identical copies and its DIFF column is constant, so the 192 columns the model keeps are 36 lab measurements (five columns each) plus 12 demographic and comorbidity fields. The API fills all copies from the single value a user enters.
 
 ---
 
 ## Engineering and Reproducibility
 
-The project was refactored from exploratory notebooks into a modular, reproducible, production-oriented ML engineering workflow.
-
-Implemented engineering improvements include:
-
-* Modular Python package structure (`src/`)
-* Reusable preprocessing pipelines
-* Centralized configuration management
-* CLI execution interface (`run.py`)
-* Versioned model persistence
-* Automated evaluation reporting
-* Metrics tracking using JSON artifacts
-* Versioned figure generation
-* Windows-safe path handling
-* Deployment-safe inference architecture
-* Reproducible training workflows
-
-The best-performing model is automatically selected, versioned, and saved during training.
+* Modular Python package (`src/`) with central configuration (`src/config.py`)
+* Dataset built in code from the raw file (`src/build_dataset.py`), with the 0–2 hour exclusion rule tested
+* All preprocessing inside scikit-learn pipelines, refitted in every cross-validation fold
+* Fixed seeds throughout: re-running the pipeline reproduces the same model file byte for byte
+* Model saved to a fixed path (`models/icu_model.joblib`) with `models/model_metadata.json`: decision threshold, feature columns, cross-validation and test results, library versions
+* The API and dashboard read the threshold from that metadata, so labels always match the evaluated model
+* pytest tests (dataset build, preprocessing, threshold and calibration helpers, model loading, API contract), run by GitHub Actions on Python 3.12 and 3.13 for every push and pull request
 
 ---
 
@@ -212,9 +253,10 @@ The application was extended into a deployable end-to-end ML system using:
 
 The FastAPI backend provides:
 
-* Live inference API
-* Schema-safe prediction handling
-* Reusable inference adapter layer
+* `POST /predict`: calibrated probability, flag and threshold
+* `GET /model-info`: threshold and held-out test results
+* Validated inputs (allowed age groups, 0/1 flags, values within the provider's −1 to 1 scale)
+* Inference adapter that fills a lab's identical summary columns from one value
 * Automatic Swagger API documentation
 
 ### Frontend
@@ -222,9 +264,9 @@ The FastAPI backend provides:
 The Streamlit frontend provides:
 
 * Interactive ICU risk dashboard
-* Structured clinical inputs
-* Probability visualization
-* Risk-level interpretation
+* Inputs limited to what the model uses (age group, comorbidities, five lab values)
+* Calibrated probability and a flag based on the model's saved threshold
+* An explanation of the threshold and its test-set performance
 * Deployment-safe API configuration
 
 ### Inference Flow
@@ -238,9 +280,9 @@ FastAPI Backend
     ↓
 Inference Adapter
     ↓
-Saved sklearn Pipeline
+Calibrated model + saved threshold
     ↓
-ICU Risk Prediction
+ICU risk estimate and flag
 ```
 
 ---
@@ -285,35 +327,43 @@ GitHub integration enables automatic redeployment on every push to the `main` br
 ```text
 icu-covid19-prediction/
 ├── app/
-│   ├── api/
-│   ├── frontend/
-│   └── utils/
+│   ├── api/main.py              # FastAPI: /predict, /model-info
+│   ├── frontend/                # Streamlit dashboard
+│   └── utils/inference.py       # user input -> training schema
 ├── data/
-│   ├── raw/
-│   │   └── README.md
-│   └── processed/
-├── notebooks/
-│   ├── 01_eda_and_data_understanding.ipynb
-│   └── 02_model_experiments.ipynb
-├── src/
-│   ├── __init__.py
-│   ├── config.py
-│   ├── data_loader.py
-│   ├── preprocessing.py
-│   ├── train.py
-│   ├── evaluate.py
-│   └── plots.py
+│   ├── raw/                     # source file from Kaggle + README
+│   └── processed/df_model.csv   # built by src/build_dataset.py
 ├── models/
+│   ├── icu_model.joblib         # final calibrated model
+│   └── model_metadata.json      # threshold, columns, CV and test results
+├── notebooks/                   # original exploration (see note below)
 ├── reports/
-├── results/
-├── Dockerfile
-├── .dockerignore
-├── start.sh
-├── run.py
+│   ├── cv_report.md             # model comparison, calibration, thresholds
+│   ├── evaluation_test.md       # final test-set evaluation
+│   └── figures/
+├── results/                     # CV results (JSON, per-fold CSV)
+├── src/
+│   ├── config.py                # paths, seeds, final model, recall target
+│   ├── build_dataset.py         # raw file -> patient-level dataset
+│   ├── preprocessing.py         # pipeline incl. missing-column filter
+│   ├── models.py                # candidate models, train/test split
+│   ├── cross_validate.py        # repeated CV on the training split
+│   ├── threshold.py             # recall-targeted threshold
+│   ├── calibration.py           # Brier score, slope, reliability curves
+│   ├── evaluate.py              # test-set metrics, bootstrap intervals
+│   ├── train.py                 # final model, threshold, test evaluation
+│   └── plots.py
+├── tests/                       # pytest suite
+├── .github/workflows/tests.yml  # CI
+├── run.py                       # runs src/train.py
 ├── requirements.txt
-├── README.md
+├── requirements-dev.txt         # + pytest, httpx2
+├── Dockerfile
+├── start.sh
 └── LICENSE
 ```
+
+The notebooks are the original exploration. Their dataset step keeps the 32 patients already in ICU during the first window; `src/build_dataset.py` supersedes it.
 
 ---
 
@@ -326,11 +376,17 @@ git clone https://github.com/Firas-Armoush-ai/icu-covid19-prediction.git
 cd icu-covid19-prediction
 ```
 
-### Install dependencies
+### Create an environment and install dependencies
+
+Tested with Python 3.13 (local) and 3.12 (Docker); CI runs both.
 
 ```bash
-pip install -r requirements.txt
+conda create -n icu-covid19 python=3.13 -y
+conda activate icu-covid19
+pip install -r requirements-dev.txt
 ```
+
+`requirements.txt` alone is enough to run the app; `requirements-dev.txt` adds the test tools.
 
 ### Rebuild the modelling dataset (optional)
 
@@ -340,10 +396,24 @@ pip install -r requirements.txt
 python -m src.build_dataset
 ```
 
-### Run ML training pipeline
+### Compare models (cross-validation)
 
 ```bash
-python run.py
+python -m src.cross_validate     # about 2 minutes; writes reports/cv_report.md
+```
+
+### Train the final model and evaluate it on the test set
+
+```bash
+python run.py                    # about 1 minute; writes models/ and reports/evaluation_test.md
+```
+
+The final model and recall target are set in `src/config.py`. Seeds are fixed, so both commands reproduce the committed results.
+
+### Run the tests
+
+```bash
+pytest
 ```
 
 ---
@@ -399,15 +469,15 @@ This repository does not claim ownership of the dataset.
 
 ---
 
-## Important Note About Inputs
+## Limitations
 
-Many numerical features in the research dataset were already normalized by the original dataset providers.
-
-Therefore:
-
-* frontend numerical inputs represent normalized clinical features
-* the deployed application is intended for educational and portfolio purposes
-* the system should not be interpreted as a real clinical diagnostic tool
+* **Small sample.** 353 patients, with 71 in the test set, so test metrics have wide intervals (ROC-AUC 0.50–0.77).
+* **One hospital group, early 2020.** Hospital Sírio-Libanês sites in São Paulo and Brasília, 28 January – 16 April 2020: before vaccines, later variants and changes in treatment. Performance elsewhere or today is unknown.
+* **Modest signal in the first two hours.** At the 90% recall target the model still flags about three in four patients.
+* **Pre-scaled inputs.** The provider scaled every numeric value to −1 to 1 and did not publish the scaling, so the model cannot take raw clinical values (for example urea in mg/dL), and GENDER is a 0/1 code whose meaning is not documented.
+* **Demo inputs are partial.** The dashboard sets age group, gender, two comorbidity flags and five lab values; the model's other inputs are filled with typical values from the training data.
+* **No vital signs.** About 70% of patients had none recorded in the first two hours, so the model drops them.
+* **Not a clinical tool.** Educational and portfolio project; it has not been validated for clinical use and must not be used to make care decisions.
 
 ---
 
@@ -419,7 +489,7 @@ Therefore:
 * Pandas
 * NumPy
 * Scikit-learn
-* XGBoost
+* XGBoost (compared in cross-validation; not used by the final model)
 
 ### Backend
 
@@ -429,6 +499,11 @@ Therefore:
 ### Frontend
 
 * Streamlit
+
+### Testing and CI
+
+* pytest
+* GitHub Actions
 
 ### Infrastructure
 

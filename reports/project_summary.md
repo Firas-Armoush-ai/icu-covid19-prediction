@@ -1,150 +1,39 @@
-# ICU Prediction for COVID-19 Patients (Early-Stage ML Model)
+# ICU Prediction for COVID-19 Patients: Project Summary
 
-## Project Summary
+## Problem
 
-This project develops a machine learning pipeline to predict whether a COVID-19 patient will require ICU admission using only early-stage clinical data (0–2 hours).
+Predict whether a confirmed COVID-19 patient will need ICU admission, using only data from the first two hours after hospital admission. Missing a patient who will need ICU is the costliest error.
 
-The objective is to support early risk identification and clinically realistic ICU prediction using leakage-safe patient-level modeling.
+## Data
 
----
+* Hospital Sírio-Libanês, *COVID-19 – Clinical Data to assess diagnosis* (Kaggle, CC BY-NC 4.0): 385 patients, São Paulo and Brasília, January–April 2020, values pre-scaled to −1..1 by the provider.
+* One row per patient from the 0–2 hour window; target = ICU admission in any window.
+* **32 patients already in ICU during that window were excluded**, following the provider's warning that those measurements may come from after admission. Final dataset: 353 patients, 163 admitted to ICU.
 
-## Problem Framing
+## Approach
 
-* **Task:** Binary classification (ICU admission)
-* **Input:** Early clinical, demographic, and laboratory features
-* **Constraint:** Use only the first observation window (0–2 hours)
-* **Goal:** Predict future ICU admission (not current ICU state)
-
-To ensure clinical realism and avoid temporal leakage, each patient is represented once using only early-stage information.
-
----
-
-## Dataset
-
-* 385 confirmed COVID-19 patients
-* Multiple temporal observation windows per patient:
-
-  * 0–2 hours
-  * 2–4 hours
-  * 4–6 hours
-  * 6–12 hours
-  * Above 12 hours
-
-### Final Modeling Dataset
-
-* One row per patient
-* Only the first observation window (0–2 hours) retained
-* Patient-level ICU target
-* Leakage-safe dataset design
-
-The processed dataset (`df_model.csv`) was generated during preprocessing and used for all training and evaluation experiments.
-
----
-
-## Methodology
-
-### Data Strategy
-
-* Restricted modeling to the first observation window (0–2 hours)
-* Constructed a patient-level ICU target
-* Removed post-admission information to prevent temporal leakage
-
-### Preprocessing
-
-* Removed features with >60% missing values
-* Numerical features:
-
-  * Median imputation
-  * Standard scaling
-* Categorical features:
-
-  * Most frequent imputation
-  * One-hot encoding
-
-### Modeling
-
-The following models were evaluated:
-
-* Logistic Regression (baseline)
-* Random Forest
-* XGBoost
-
-All experiments used a stratified 80/20 train-test split.
-
----
+* Fixed 80/20 stratified split: 282 training patients, 71 held-out test patients.
+* Logistic regression, random forest and XGBoost (library defaults), each with and without sigmoid calibration, compared by 5-fold × 10-repeat cross-validation on the training split, with all preprocessing refitted inside every fold.
+* Decision threshold set from out-of-fold predictions to reach 90% recall.
+* Final model and threshold committed before a single evaluation on the test set, with bootstrap intervals.
 
 ## Results
 
-| Model         | Accuracy   | Precision | Recall     | F1         | ROC-AUC    |
-| ------------- | ---------- | --------- | ---------- | ---------- | ---------- |
-| logistic      | 0.6883     | 0.6829    | 0.7179     | 0.7000     | 0.6920     |
-| random_forest | **0.7013** | 0.6667    | **0.8205** | **0.7356** | 0.7203     |
-| xgboost       | 0.6494     | 0.6304    | 0.7436     | 0.6824     | **0.7379** |
+* Cross-validation: models were indistinguishable on ROC-AUC (0.67–0.71); uncalibrated models were badly overconfident (calibration slopes 0.14–0.31), and sigmoid calibration fixed it.
+* Final model: **calibrated random forest, threshold 0.352**.
+* Test set: ROC-AUC 0.643 (95% CI 0.502–0.765); at the threshold, recall 0.818 (27 of 33), precision 0.519, specificity 0.342.
+* Most-used features: age, gender, lymphocytes, C-reactive protein, platelets, urea, neutrophils.
 
----
+## Takeaways
 
-## Model Selection
+* Fixing the 0–2 hour leakage and evaluating properly lowered the headline numbers, and made them trustworthy.
+* Early data supports a cautious screen (rule out about a third of patients who will not need ICU), not a confident predictor.
+* Probability calibration matters as much as discrimination when a dashboard shows probabilities.
 
-Random Forest was selected as the final model based on its overall balance between recall and F1-score, which are particularly important for this clinical use case.
+## Possible next steps
 
-### Selection Rationale
+* Validate on data from another hospital or a later period.
+* Reduce the redundant lab columns (at 0–2 hours each lab's MEAN, MEDIAN, MIN and MAX are identical) and test a regularised logistic model with nested cross-validation.
+* Use later time windows for a separate, later-stage prediction task.
 
-* Highest F1-score across evaluated models
-* Highest recall (~0.82), reducing false negatives
-* Stable performance across metrics
-* Effective handling of non-linear relationships in tabular clinical data
-
-Although XGBoost achieved a slightly higher ROC-AUC, Random Forest provided the most suitable trade-off for early ICU risk prediction.
-
-From a clinical perspective, minimizing false negatives (missed ICU cases) is a priority.
-
----
-
-## Key Insights
-
-The model identified clinically meaningful predictors associated with ICU admission risk, including:
-
-* Age
-* Lymphocyte levels
-* Urea
-* C-reactive protein (PCR)
-* Platelets
-* Sodium levels
-
-These findings align with known indicators of COVID-19 severity.
-
----
-
-## Engineering and Reproducibility
-
-The project was refactored from exploratory notebooks into a modular and reproducible machine learning system.
-
-Implemented engineering improvements include:
-
-* Modular package structure (`src/`)
-* Reusable preprocessing pipeline
-* CLI execution interface (`run.py`)
-* Versioned model persistence
-* Metrics tracking using JSON artifacts
-* Automated evaluation report generation
-* Versioned figure and report saving
-* Windows-safe path handling
-* Reproducible training workflow
-
-The best-performing model is automatically selected, versioned, and saved during training.
-
----
-
-## Key Takeaways and Next Steps
-
-* Early-stage ICU prediction is feasible using limited clinical data when temporal structure is handled correctly
-* Restricting the dataset to the first observation window (0–2 hours) is essential to prevent temporal leakage
-* Tree-based models outperformed linear models on this dataset
-* Model behavior aligns with established clinical indicators of COVID-19 severity
-
-Potential future improvements include:
-
-* Hyperparameter optimization
-* Cross-validation
-* Probability calibration
-* Deployment as a clinical decision support tool
+Details: [README](../README.md), [cross-validation report](cv_report.md), [test-set evaluation](evaluation_test.md).
