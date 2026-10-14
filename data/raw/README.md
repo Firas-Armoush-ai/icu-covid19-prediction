@@ -1,58 +1,21 @@
-# Raw Data
-This project uses the Hospital Sírio-Libanês COVID-19 ICU Prediction dataset.
+# Raw data
 
-## Dataset License
-The dataset is distributed under the following license:
-* CC BY-NC 4.0
-* https://creativecommons.org/licenses/by-nc/4.0/
+`Kaggle_Sirio_Libanes_ICU_Prediction.xlsx` is the source file from the
+Hospital Sírio-Libanês **COVID-19 – Clinical Data to assess diagnosis** dataset
+(Kaggle, version 4).
 
-## Attribution
-Dataset source:
-* Hospital Sírio-Libanês / Kaggle COVID-19 ICU Prediction Dataset
+* Source: https://www.kaggle.com/datasets/S%C3%ADrio-Libanes/covid19
+* Licence: [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/). Non-commercial use only, with attribution. The repository's MIT License covers the code, not this data.
+* Citation: see [Dataset source](../../README.md#dataset-source) in the main README.
 
-## Accessing the Dataset
-The original raw dataset is included in this repository under:
+## What the file contains
 
-```
-data/raw/
-```
+* 385 patients × 5 time windows = 1,925 rows, 231 columns.
+* Windows: 0–2 h, 2–4 h, 4–6 h, 6–12 h and above 12 h from admission.
+* Period covered: 28 January – 16 April 2020; Hospital Sírio-Libanês sites in São Paulo and Brasília.
+* The provider anonymised the data and min-max scaled every numeric column to the range −1 to 1 before publication. A model trained on it therefore expects these scaled values, not raw clinical units.
 
-Alternatively, the dataset can be downloaded from its original public source:
+## Processed data
 
-* [Kaggle - COVID-19 ICU Prediction Dataset](https://www.kaggle.com/datasets/S%C3%ADrio-Liban%C3%AAs/covid19?utm_source=chatgpt.com)
-
-
-
-
-## Processed Dataset
-
-The processed modeling dataset generated during preprocessing is stored in:
-
-```
-data/processed/
-```
-
-File:
-
-```
-df_model.csv
-```
-
-This processed dataset:
-
-* uses one row per patient
-* contains only the first observation window (0–2 hours)
-* is structured to prevent temporal leakage
-* is used for all training and evaluation experiments
-
-
-
-## Notes
-
-* Most raw dataset features are ALREADY normalized/scaled by the hospital dataset creators.
-* Normalization, standardization, proprietary scaling, or transformed clinical encoding performed BEFORE the dataset was published.
-* The processed dataset (`df_model.csv`) was generated from the original raw dataset during preprocessing.
-* This repository is intended for educational, research, and portfolio purposes only.
-
-
-* During EDA, We observed that: Normalization, standardization, proprietary scaling, or transformed clinical encoding performed BEFORE the dataset was published (features values min/max near -1/+1). Therefore my current model is actually "dataset-specific" Not "real-hospital-production-ready"
+`data/processed/df_model.csv` is derived from this file. The steps are described in the
+[Licence](../../README.md#licence) section of the main README.
