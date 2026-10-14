@@ -462,7 +462,7 @@ docker run -p 8501:8501 -p 8000:8000 icu-prediction-app
 
 * **Code** is released under the [MIT License](LICENSE). The MIT License does not cover the data.
 * **Data** (`data/`) comes from Hospital Sírio-Libanês and is redistributed under its original [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) licence: you may share and adapt it for **non-commercial** purposes, with attribution (see [Dataset source](#dataset-source)).
-  * `data/raw/Kaggle_Sirio_Libanes_ICU_Prediction.xlsx` is the source file from Kaggle.
+  * `data/raw/Kaggle_Sirio_Libanes_ICU_Prediction.xlsx` is the original file from Kaggle, unmodified (SHA-256 `325889ae…8ebd1`; a test checks it).
   * `data/processed/df_model.csv` is a derived file. Changes made (see `src/build_dataset.py`): kept only the 0–2 hour window (one row per patient), excluded the 32 patients already in ICU in that window, set the target to whether the patient was admitted to ICU in any window, and removed the `WINDOW` column.
 
 This repository does not claim ownership of the dataset.
