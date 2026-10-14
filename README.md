@@ -5,6 +5,8 @@
 🚀 **Live Demo:**
 https://icu-covid19-prediction.onrender.com/
 
+> The demo runs on Render's free plan, which puts the app to sleep after 15 minutes without visitors. The next visit shows a "Service waking up" screen for about a minute (about 80 seconds when tested on 14 October 2026) before the dashboard loads.
+
 📘 **API documentation:** the live site serves the Streamlit dashboard only. The FastAPI backend runs privately inside the same container, so its Swagger docs are available when you run the app locally, at http://127.0.0.1:8000/docs (see [Run Application Locally](#run-application-locally)).
 
 ---
