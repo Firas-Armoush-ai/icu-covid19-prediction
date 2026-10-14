@@ -16,7 +16,7 @@ Values are mean ± standard deviation across folds. The standard deviation shows
 | random_forest | 0.686 ± 0.063 | 0.619 ± 0.073 | 0.642 ± 0.083 | 0.637 ± 0.067 | 0.636 ± 0.062 |
 | xgboost | 0.695 ± 0.070 | 0.651 ± 0.077 | 0.605 ± 0.105 | 0.621 ± 0.073 | 0.609 ± 0.075 |
 | logistic+sigmoid | 0.667 ± 0.083 | 0.653 ± 0.086 | 0.292 ± 0.113 | 0.685 ± 0.154 | 0.398 ± 0.119 |
-| random_forest+sigmoid | 0.695 ± 0.064 | 0.627 ± 0.073 | 0.593 ± 0.089 | 0.652 ± 0.078 | 0.616 ± 0.064 |
+| random_forest+sigmoid (final) | 0.695 ± 0.064 | 0.627 ± 0.073 | 0.593 ± 0.089 | 0.652 ± 0.078 | 0.616 ± 0.064 |
 | xgboost+sigmoid | 0.709 ± 0.067 | 0.661 ± 0.078 | 0.575 ± 0.088 | 0.644 ± 0.075 | 0.603 ± 0.064 |
 
 Per-fold ROC-AUC difference between the candidate with the highest mean ROC-AUC (**xgboost+sigmoid**) and each other candidate:
@@ -39,7 +39,7 @@ Out-of-fold probabilities, per repeat, summarised. A slope near 1 and an interce
 | random_forest | 0.235 ± 0.009 | 0.24 ± 0.07 | -0.09 | 0.465 vs 0.461 |
 | xgboost | 0.252 ± 0.012 | 0.31 ± 0.03 | -0.09 | 0.460 vs 0.461 |
 | logistic+sigmoid | 0.236 ± 0.003 | 1.14 ± 0.32 | +0.04 | 0.458 vs 0.461 |
-| random_forest+sigmoid | 0.225 ± 0.004 | 1.17 ± 0.22 | +0.00 | 0.465 vs 0.461 |
+| random_forest+sigmoid (final) | 0.225 ± 0.004 | 1.17 ± 0.22 | +0.00 | 0.465 vs 0.461 |
 | xgboost+sigmoid | 0.222 ± 0.004 | 1.32 ± 0.25 | +0.02 | 0.466 vs 0.461 |
 
 Reference Brier score for always predicting the ICU rate: 0.248 (lower is better). Reliability curves: `reports/figures/reliability_oof_uncalibrated.png` and `reports/figures/reliability_oof_sigmoid.png`.
@@ -54,10 +54,10 @@ For each target, a threshold is chosen in every repeat from that repeat's out-of
 | logistic+sigmoid | 0.85 | 0.418 | 0.515 ± 0.012 | 0.312 ± 0.033 | 76% |
 | logistic+sigmoid | 0.90 | 0.405 | 0.497 ± 0.009 | 0.222 ± 0.029 | 83% |
 | logistic+sigmoid | 0.95 | 0.349 | 0.468 ± 0.009 | 0.072 ± 0.034 | 94% |
-| random_forest+sigmoid | 0.80 | 0.412 | 0.583 ± 0.022 | 0.509 ± 0.044 | 63% |
-| random_forest+sigmoid | 0.85 | 0.377 | 0.554 ± 0.009 | 0.412 ± 0.023 | 71% |
-| random_forest+sigmoid | 0.90 | 0.352 | 0.539 ± 0.013 | 0.340 ± 0.035 | 77% |
-| random_forest+sigmoid | 0.95 | 0.278 | 0.485 ± 0.015 | 0.132 ± 0.052 | 91% |
+| random_forest+sigmoid (final) | 0.80 | 0.412 | 0.583 ± 0.022 | 0.509 ± 0.044 | 63% |
+| random_forest+sigmoid (final) | 0.85 | 0.377 | 0.554 ± 0.009 | 0.412 ± 0.023 | 71% |
+| random_forest+sigmoid (final) | 0.90 | 0.352 | 0.539 ± 0.013 | 0.340 ± 0.035 | 77% |
+| random_forest+sigmoid (final) | 0.95 | 0.278 | 0.485 ± 0.015 | 0.132 ± 0.052 | 91% |
 | xgboost+sigmoid | 0.80 | 0.398 | 0.580 ± 0.020 | 0.503 ± 0.040 | 64% |
 | xgboost+sigmoid | 0.85 | 0.369 | 0.556 ± 0.018 | 0.416 ± 0.044 | 71% |
 | xgboost+sigmoid | 0.90 | 0.344 | 0.536 ± 0.020 | 0.331 ± 0.054 | 78% |

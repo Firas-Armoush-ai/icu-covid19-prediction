@@ -3,7 +3,7 @@
   "n_repeats": 10,
   "n_train": 282,
   "n_train_positive": 130,
-  "final_model": null,
+  "final_model": "random_forest+sigmoid",
   "summary": {
     "logistic": {
       "roc_auc": {
