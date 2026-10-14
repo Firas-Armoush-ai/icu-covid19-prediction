@@ -46,3 +46,12 @@ EVAL_METRIC = "logloss"
 
 # Test size
 TEST_SIZE = 0.2
+
+# Final model and decision threshold, chosen from the cross-validation report
+# (reports/cv_report.md). Set after reviewing those results.
+FINAL_MODEL = "random_forest+sigmoid"
+RECALL_TARGET = 0.90
+
+# Saved model and its metadata (threshold, columns, evaluation results)
+MODEL_PATH = PROJECT_ROOT / "models" / "icu_model.joblib"
+METADATA_PATH = PROJECT_ROOT / "models" / "model_metadata.json"
