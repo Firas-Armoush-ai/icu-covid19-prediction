@@ -1,12 +1,12 @@
-"""Contract tests for the FastAPI /predict endpoint."""
+"""Contract tests for the FastAPI endpoints."""
 
 import pytest
 from fastapi.testclient import TestClient
 
-from app.api.main import app
+from app.api.main import THRESHOLD, app
 
 EXAMPLE_PATIENT = {
-    "AGE_ABOVE65": 1,
+    "AGE_PERCENTIL": "70th",
     "GENDER": 0,
     "HTN": 1,
     "IMMUNOCOMPROMISED": 0,
@@ -17,33 +17,40 @@ EXAMPLE_PATIENT = {
     "CREATININ_MEDIAN": -0.924,
 }
 
+LABELS = {1: "Flag for ICU review", 0: "Below review threshold"}
+
 
 @pytest.fixture(scope="module")
 def client():
     return TestClient(app)
 
 
+def predict(client, **changes):
+    response = client.post("/predict", json={**EXAMPLE_PATIENT, **changes})
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
 def test_root(client):
     response = client.get("/")
     assert response.status_code == 200
+    assert response.json()["model"] == "random_forest+sigmoid"
 
 
 def test_predict_returns_valid_response(client):
-    response = client.post("/predict", json=EXAMPLE_PATIENT)
+    body = predict(client)
 
-    assert response.status_code == 200
-    body = response.json()
-    assert set(body) == {"icu_probability", "prediction", "risk_level"}
+    assert set(body) == {"icu_probability", "prediction", "risk_level", "threshold"}
     assert 0.0 <= body["icu_probability"] <= 1.0
     assert body["prediction"] in (0, 1)
-    assert body["risk_level"] in ("High Risk", "Low Risk")
+    assert body["risk_level"] == LABELS[body["prediction"]]
 
 
-def test_predict_label_matches_probability(client):
-    body = client.post("/predict", json=EXAMPLE_PATIENT).json()
+def test_label_uses_saved_threshold(client):
+    body = predict(client)
 
-    expected_label = 1 if body["icu_probability"] >= 0.5 else 0
-    assert body["prediction"] == expected_label
+    assert body["threshold"] == round(THRESHOLD, 4)
+    assert body["prediction"] == int(body["icu_probability"] >= THRESHOLD)
 
 
 def test_predict_accepts_empty_payload(client):
@@ -52,12 +59,38 @@ def test_predict_accepts_empty_payload(client):
     assert response.status_code == 200
 
 
-def test_predict_rejects_wrong_type(client):
-    response = client.post("/predict", json={"AGE_ABOVE65": "not-a-number"})
+def test_lab_input_changes_the_estimate(client):
+    low = predict(client, UREA_MEDIAN=-1.0)["icu_probability"]
+    high = predict(client, UREA_MEDIAN=1.0)["icu_probability"]
+    assert low != high
+
+
+def test_age_group_changes_the_estimate(client):
+    young = predict(client, AGE_PERCENTIL="10th")["icu_probability"]
+    old = predict(client, AGE_PERCENTIL="Above 90th")["icu_probability"]
+    assert young != old
+
+
+@pytest.mark.parametrize("changes", [
+    {"HEART_RATE_MEDIAN": 0.1},          # vital signs are not model inputs
+    {"AGE_ABOVE65": 1},                   # derived from AGE_PERCENTIL, not an input
+    {"UREA_MEDIAN": 3.0},                 # outside the provider's -1..1 scale
+    {"AGE_PERCENTIL": "65"},              # not one of the dataset's groups
+    {"HTN": 2},                           # binary
+    {"GENDER": "not-a-number"},
+])
+def test_predict_rejects_invalid_input(client, changes):
+    response = client.post("/predict", json={**EXAMPLE_PATIENT, **changes})
     assert response.status_code == 422
 
 
 def test_predict_is_deterministic(client):
-    first = client.post("/predict", json=EXAMPLE_PATIENT).json()
-    second = client.post("/predict", json=EXAMPLE_PATIENT).json()
-    assert first == second
+    assert predict(client) == predict(client)
+
+
+def test_model_info(client):
+    body = client.get("/model-info").json()
+
+    assert body["threshold"] == round(THRESHOLD, 4)
+    assert body["recall_target"] == 0.9
+    assert body["test"]["n_patients"] == sum(body["test"]["confusion"].values())

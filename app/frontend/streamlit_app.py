@@ -1,11 +1,8 @@
 import streamlit as st
 import requests
 
-from config import PREDICT_ENDPOINT
-from utils import (
-    get_risk_level,
-    get_risk_color
-)
+from config import MODEL_INFO_ENDPOINT, PREDICT_ENDPOINT
+from utils import AGE_GROUPS, threshold_explanation, yes_no_to_int
 
 # =========================================================
 # PAGE CONFIG
@@ -25,48 +22,56 @@ st.sidebar.title("About")
 
 st.sidebar.markdown(
     """
-    This application predicts ICU admission risk
-    using early-stage COVID-19 clinical data.
+    This application estimates the risk of ICU admission
+    for confirmed COVID-19 patients from data collected
+    in the first two hours after admission.
 
     Built with:
     - Streamlit
     - FastAPI
-    - Scikit-learn
-    - Docker-ready architecture
+    - scikit-learn (calibrated random forest)
+    - Docker
     """
 )
 
 st.sidebar.divider()
 
-st.sidebar.info(
-    "Prediction uses the first 0–2 hours "
-    "of clinical measurements."
-)
-
 st.sidebar.warning(
     """
-    This demo uses normalized research dataset features
-    and is intended for educational and portfolio
-    purposes only.
+    **Not a clinical tool.** Educational and portfolio
+    project, built from 353 patients at one hospital
+    group in Brazil (January–April 2020).
 
-    Most numerical inputs are scaled approximately
-    between -1 and +1.
+    The dataset provider scaled every numeric value
+    to the range -1 to +1, so the inputs below are
+    scaled values, not clinical units.
     """
 )
 
 st.sidebar.caption(
-    "🧪 Default values represent an example "
-    "normalized patient profile from the dataset."
+    "🧪 Default values are an example patient profile "
+    "from the dataset."
 )
 
 st.sidebar.divider()
 
 st.sidebar.markdown(
     """
-    **Built by Firas Armoush**  
-    [GitHub](https://github.com/Firas-Armoush-ai)
+    **Built by Firas Armoush**
+    [GitHub](https://github.com/Firas-Armoush-ai/icu-covid19-prediction)
     """
 )
+
+# =========================================================
+# MODEL INFO (threshold and test results, from the API)
+# =========================================================
+
+@st.cache_data(ttl=3600)
+def load_model_info():
+    response = requests.get(MODEL_INFO_ENDPOINT, timeout=10)
+    response.raise_for_status()
+    return response.json()
+
 # =========================================================
 # MAIN TITLE
 # =========================================================
@@ -75,8 +80,8 @@ st.title("🩺 ICU Risk Prediction Dashboard")
 
 st.markdown(
     """
-    Predict the probability of ICU admission
-    using early-stage patient clinical data.
+    Estimate the probability of ICU admission
+    from early-stage patient data.
     """
 )
 
@@ -96,16 +101,26 @@ with st.form("prediction_form"):
 
     st.markdown("### Demographics")
 
-    age = st.slider(
-        "Age",
-        min_value=0,
-        max_value=100,
-        value=68
+    age_group = st.selectbox(
+        "Age group (percentile)",
+        AGE_GROUPS,
+        index=AGE_GROUPS.index("70th"),
+        help=(
+            "The dataset records age only as percentile groups, "
+            "not years. Groups from the 60th percentile up are "
+            "the patients aged over 65."
+        )
     )
 
-    gender = st.selectbox(
-        "Gender",
-        ["Male", "Female"]
+    gender = st.radio(
+        "Gender (dataset code)",
+        [0, 1],
+        format_func=lambda code: f"Code {code}",
+        horizontal=True,
+        help=(
+            "The dataset provider codes gender as 0 or 1 "
+            "without saying which is which."
+        )
     )
 
     htn = st.selectbox(
@@ -121,105 +136,67 @@ with st.form("prediction_form"):
     st.divider()
 
     # =====================================================
-    # VITAL SIGNS
-    # =====================================================
-
-    st.markdown("### Vital Signs")
-
-    st.caption(
-        "Normalized clinical features "
-        "(approximately scaled between -1 and +1)"
-    )
-
-    heart_rate = st.slider(
-        "HEART_RATE_MEDIAN",
-        min_value=-1.0,
-        max_value=1.0,
-        value=-0.358,
-        step=0.01,
-        help="Normalized heart rate feature"
-    )
-
-    respiratory_rate = st.slider(
-        "RESPIRATORY_RATE_MEDIAN",
-        min_value=-1.0,
-        max_value=1.0,
-        value=-0.586,
-        step=0.01,
-        help="Normalized respiratory rate feature"
-    )
-
-    oxygen_saturation = st.slider(
-        "OXYGEN_SATURATION_MEDIAN",
-        min_value=-1.0,
-        max_value=1.0,
-        value=0.684,
-        step=0.01,
-        help="Normalized oxygen saturation feature"
-    )
-
-    st.divider()
-
-    # =====================================================
     # LABORATORY VALUES
     # =====================================================
 
     st.markdown("### Laboratory Measurements")
 
     st.caption(
-        "Normalized laboratory features "
-        "(approximately scaled between -1 and +1)"
+        "Scaled laboratory values (-1 to +1, as published by the "
+        "data provider). These five are sent as entered; the model's "
+        "other lab results are filled with typical values from the "
+        "training data."
     )
 
     albumin = st.slider(
-        "ALBUMIN_MEDIAN",
+        "Albumin",
         min_value=-1.0,
         max_value=1.0,
         value=0.263,
-        step=0.01,
-        help="Normalized albumin feature"
+        step=0.01
     )
 
     pcr = st.slider(
-        "PCR_MEDIAN",
+        "C-reactive protein (PCR)",
         min_value=-1.0,
         max_value=1.0,
         value=-0.958,
-        step=0.01,
-        help="Normalized PCR feature"
+        step=0.01
     )
 
     urea = st.slider(
-        "UREA_MEDIAN",
+        "Urea",
         min_value=-1.0,
         max_value=1.0,
         value=-0.880,
-        step=0.01,
-        help="Normalized urea feature"
+        step=0.01
     )
 
     creatinin = st.slider(
-        "CREATININ_MEDIAN",
+        "Creatinine",
         min_value=-1.0,
         max_value=1.0,
         value=-0.924,
-        step=0.01,
-        help="Normalized creatinin feature"
+        step=0.01
     )
 
     be_arterial = st.slider(
-        "BE_ARTERIAL_MEDIAN",
+        "Arterial base excess",
         min_value=-1.0,
         max_value=1.0,
         value=-1.0,
-        step=0.01,
-        help="Normalized arterial base excess feature"
+        step=0.01
+    )
+
+    st.caption(
+        "Vital signs are not inputs: about 70% of patients had none "
+        "recorded in the first two hours, so the model does not use them."
     )
 
     st.divider()
 
     submitted = st.form_submit_button(
-        "Predict ICU Risk"
+        "Estimate ICU Risk"
     )
 
 # =========================================================
@@ -229,39 +206,20 @@ with st.form("prediction_form"):
 if submitted:
 
     payload = {
-
-        "AGE_ABOVE65": 1 if age >= 65 else 0,
-
-        "GENDER": 1 if gender == "Male" else 0,
-
-        "HTN": 1 if htn == "Yes" else 0,
-
-        "IMMUNOCOMPROMISED": (
-            1 if immuno == "Yes" else 0
-        ),
-
+        "AGE_PERCENTIL": age_group,
+        "GENDER": gender,
+        "HTN": yes_no_to_int(htn),
+        "IMMUNOCOMPROMISED": yes_no_to_int(immuno),
         "ALBUMIN_MEDIAN": albumin,
-
         "BE_ARTERIAL_MEDIAN": be_arterial,
-
         "PCR_MEDIAN": pcr,
-
         "UREA_MEDIAN": urea,
-
         "CREATININ_MEDIAN": creatinin,
-
-        "HEART_RATE_MEDIAN": heart_rate,
-
-        "RESPIRATORY_RATE_MEDIAN": respiratory_rate,
-
-        "OXYGEN_SATURATION_MEDIAN": oxygen_saturation
     }
 
     try:
 
-        with st.spinner(
-            "Generating prediction..."
-        ):
+        with st.spinner("Estimating..."):
 
             response = requests.post(
                 PREDICT_ENDPOINT,
@@ -277,74 +235,42 @@ if submitted:
 
             result = response.json()
 
-            probability = result[
-                "icu_probability"
-            ]
-
-            prediction = result[
-                "prediction"
-            ]
-
-            risk_level = get_risk_level(
-                probability
-            )
-
-            risk_color = get_risk_color(
-                probability
-            )
-
-            st.success(
-                "Prediction completed successfully."
-            )
+            probability = result["icu_probability"]
 
             st.divider()
 
-            st.subheader("Prediction Result")
+            st.subheader("Result")
 
-            # ---------------------------------------------
-            # Risk label
-            # ---------------------------------------------
-
-            if prediction == 1:
-
-                st.error(
-                    f"{risk_level}"
-                )
-
+            if result["prediction"] == 1:
+                st.error(result["risk_level"])
             else:
-
-                st.success(
-                    f"{risk_level}"
-                )
-
-            # ---------------------------------------------
-            # Probability
-            # ---------------------------------------------
+                st.success(result["risk_level"])
 
             st.metric(
-                label="ICU Risk Probability",
-                value=f"{probability:.2%}"
+                label="Estimated probability of ICU admission",
+                value=f"{probability:.0%}"
             )
-
-            # ---------------------------------------------
-            # Progress bar
-            # ---------------------------------------------
 
             st.progress(float(probability))
 
             # ---------------------------------------------
-            # Interpretation
+            # How to read the result
             # ---------------------------------------------
 
-            st.markdown(
-                "### Clinical Interpretation"
-            )
+            st.markdown("### How to read this")
+
+            try:
+                st.markdown(threshold_explanation(load_model_info()))
+            except requests.exceptions.RequestException:
+                st.markdown(
+                    f"Patients at or above **{result['threshold']:.0%}** are flagged."
+                )
 
             st.write(
-                "The prediction reflects the estimated "
-                "probability that the patient may "
-                "require ICU admission based on "
-                "early-stage normalized clinical features."
+                "The probability is calibrated: among many patients given "
+                "a similar estimate, about that share went on to need ICU. "
+                "Data from the first two hours carries limited signal, so "
+                "most estimates fall between about 25% and 70%."
             )
 
         # =================================================

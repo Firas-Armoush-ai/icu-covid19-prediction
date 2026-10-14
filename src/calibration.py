@@ -26,7 +26,8 @@ def calibration_slope_intercept(y_true, proba, eps=1e-6):
     p = np.clip(np.asarray(proba), eps, 1 - eps)
     logit = np.log(p / (1 - p)).reshape(-1, 1)
 
-    fit = LogisticRegression(penalty=None).fit(logit, y_true)
+    # A very large C makes the fit effectively unpenalised.
+    fit = LogisticRegression(C=1e12).fit(logit, y_true)
 
     return float(fit.coef_[0, 0]), float(fit.intercept_[0])
 
