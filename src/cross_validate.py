@@ -1,0 +1,310 @@
+# src/cross_validate.py
+# Purpose: Compare candidate models with repeated stratified cross-validation
+#          on the training split only, and keep out-of-fold predictions for
+#          choosing the decision threshold and checking calibration.
+#
+# Run from the project root:
+#     python -m src.cross_validate
+
+import json
+
+import numpy as np
+import pandas as pd
+
+from sklearn.metrics import (
+    average_precision_score,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
+from sklearn.model_selection import RepeatedStratifiedKFold
+
+from .calibration import calibration_summary, save_reliability_plot
+from .config import FINAL_MODEL, PROJECT_ROOT, RANDOM_STATE
+from .models import CALIBRATION_SUFFIX, CANDIDATES, build_model, load_split
+from .threshold import threshold_table
+
+N_SPLITS = 5
+N_REPEATS = 10
+
+# Metrics that do not depend on a decision threshold come first.
+METRICS = ["roc_auc", "pr_auc", "recall", "precision", "f1"]
+
+METRIC_LABELS = {
+    "roc_auc": "ROC-AUC",
+    "pr_auc": "PR-AUC",
+    "recall": "Recall @0.5",
+    "precision": "Precision @0.5",
+    "f1": "F1 @0.5",
+}
+
+# Recall targets shown in the report, to choose the decision threshold from
+RECALL_TARGETS = [0.80, 0.85, 0.90, 0.95]
+
+RESULTS_DIR = PROJECT_ROOT / "results"
+REPORTS_DIR = PROJECT_ROOT / "reports"
+
+
+def fold_metrics(y_true, proba, threshold=0.5):
+
+    y_pred = (proba >= threshold).astype(int)
+
+    return {
+        "roc_auc": roc_auc_score(y_true, proba),
+        "pr_auc": average_precision_score(y_true, proba),
+        "recall": recall_score(y_true, y_pred),
+        "precision": precision_score(y_true, y_pred, zero_division=0),
+        "f1": f1_score(y_true, y_pred),
+    }
+
+
+def run_cv(X, y, candidates=CANDIDATES, n_splits=N_SPLITS, n_repeats=N_REPEATS, seed=RANDOM_STATE):
+    """
+    Return (fold_results, oof).
+
+    fold_results: one row per candidate x fold with the metrics above.
+    oof: {candidate: array of shape (n_samples, n_repeats)} with each patient's
+         out-of-fold probability in every repeat.
+
+    Each fold fits a fresh model, so imputation, scaling, encoding, the
+    missing-column filter and any calibration are learned from that fold's
+    training rows only.
+    """
+
+    cv = RepeatedStratifiedKFold(n_splits=n_splits, n_repeats=n_repeats, random_state=seed)
+
+    rows = []
+    oof = {name: np.full((len(y), n_repeats), np.nan) for name in candidates}
+
+    for fold_index, (train_idx, val_idx) in enumerate(cv.split(X, y)):
+
+        repeat = fold_index // n_splits
+        y_val = y.iloc[val_idx]
+
+        for name in candidates:
+
+            model = build_model(name)
+            model.fit(X.iloc[train_idx], y.iloc[train_idx])
+
+            proba = model.predict_proba(X.iloc[val_idx])[:, 1]
+            oof[name][val_idx, repeat] = proba
+
+            rows.append({
+                "model": name,
+                "repeat": repeat,
+                "fold": fold_index % n_splits,
+                **fold_metrics(y_val, proba),
+            })
+
+    return pd.DataFrame(rows), oof
+
+
+def summarise(fold_results):
+    """Mean and standard deviation of each metric across all folds."""
+
+    summary = {}
+
+    for name, group in fold_results.groupby("model", sort=False):
+        summary[name] = {
+            metric: {
+                "mean": float(group[metric].mean()),
+                "std": float(group[metric].std(ddof=1)),
+            }
+            for metric in METRICS
+        }
+
+    return summary
+
+
+def paired_comparison(fold_results, reference, metric="roc_auc"):
+    """Per-fold difference between a reference candidate and each other candidate."""
+
+    wide = fold_results.pivot_table(index=["repeat", "fold"], columns="model", values=metric)
+
+    comparison = {}
+    for other in wide.columns:
+        if other == reference:
+            continue
+        diff = wide[reference] - wide[other]
+        comparison[other] = {
+            "mean_difference": float(diff.mean()),
+            "std_difference": float(diff.std(ddof=1)),
+            "share_of_folds_reference_is_higher": float((diff > 0).mean()),
+        }
+
+    return comparison
+
+
+def oof_long(oof, y):
+    """Out-of-fold probabilities in long format: one row per candidate x repeat x patient."""
+
+    frames = []
+    for name, matrix in oof.items():
+        for r in range(matrix.shape[1]):
+            frames.append(pd.DataFrame({
+                "model": name,
+                "repeat": r,
+                "row": np.arange(len(y)),
+                "y_true": y.to_numpy(),
+                "proba": matrix[:, r],
+            }))
+    return pd.concat(frames, ignore_index=True)
+
+
+def label(name):
+    return f"{name} (final)" if name == FINAL_MODEL else name
+
+
+def write_report(summary, top_auc, comparison, n_train, n_positive, thresholds, calibration):
+
+    lines = [
+        "# Cross-validation report",
+        "",
+        "Generated by `python -m src.cross_validate`.",
+        "",
+        f"Repeated stratified {N_SPLITS}-fold cross-validation, {N_REPEATS} repeats "
+        f"({N_SPLITS * N_REPEATS} folds), on the training split only "
+        f"({n_train} patients, {n_positive} admitted to ICU). The test set is not used here.",
+        "",
+        "Each model is evaluated as it is and with sigmoid (Platt) calibration (`+sigmoid`). "
+        "All models use library defaults; there is no hyperparameter tuning.",
+        "",
+        "Values are mean ± standard deviation across folds. The standard deviation shows how much "
+        "results move between folds; it is not a confidence interval, because folds share training data.",
+        "",
+        "## Discrimination",
+        "",
+        "| Model | " + " | ".join(METRIC_LABELS[m] for m in METRICS) + " |",
+        "| --- | " + " | ".join("---" for _ in METRICS) + " |",
+    ]
+
+    for name, metrics in summary.items():
+        cells = [f"{metrics[m]['mean']:.3f} ± {metrics[m]['std']:.3f}" for m in METRICS]
+        lines.append(f"| {label(name)} | " + " | ".join(cells) + " |")
+
+    lines += [
+        "",
+        f"Per-fold ROC-AUC difference between the candidate with the highest mean ROC-AUC "
+        f"(**{top_auc}**) and each other candidate:",
+        "",
+        "| Compared with | Mean difference | SD of difference | Folds where it is higher |",
+        "| --- | --- | --- | --- |",
+    ]
+
+    for other, c in comparison.items():
+        lines.append(
+            f"| {other} | {c['mean_difference']:+.3f} | {c['std_difference']:.3f} "
+            f"| {c['share_of_folds_reference_is_higher']:.0%} |"
+        )
+
+    lines += [
+        "",
+        "## Calibration",
+        "",
+        "Out-of-fold probabilities, per repeat, summarised. A slope near 1 and an intercept near 0 "
+        "mean the probabilities can be read at face value; a slope below 1 means they are too extreme, "
+        "above 1 too cautious.",
+        "",
+        "| Model | Brier score | Calibration slope | Intercept | Mean predicted vs observed |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+
+    for name, c in calibration.items():
+        lines.append(
+            f"| {label(name)} | {c['brier_mean']:.3f} ± {c['brier_std']:.3f} "
+            f"| {c['slope_mean']:.2f} ± {c['slope_std']:.2f} | {c['intercept_mean']:+.2f} "
+            f"| {c['mean_predicted']:.3f} vs {c['observed_rate']:.3f} |"
+        )
+
+    lines += [
+        "",
+        f"Reference Brier score for always predicting the ICU rate: "
+        f"{next(iter(calibration.values()))['brier_reference']:.3f} (lower is better). "
+        "Reliability curves: `reports/figures/reliability_oof_uncalibrated.png` and "
+        "`reports/figures/reliability_oof_sigmoid.png`.",
+        "",
+        "## Precision at recall targets (calibrated models)",
+        "",
+        "For each target, a threshold is chosen in every repeat from that repeat's out-of-fold "
+        "probabilities (the highest threshold that still reaches the target). Values are means "
+        "across repeats; the threshold shown is the median, which is the one the final model would use.",
+        "",
+        "| Model | Recall target | Threshold | Precision | Specificity | Share of patients flagged |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ]
+
+    for name, table in thresholds.items():
+        for _, row in table.iterrows():
+            lines.append(
+                f"| {label(name)} | {row['recall_target']:.2f} | {row['threshold']:.3f} "
+                f"| {row['precision_mean']:.3f} ± {row['precision_std']:.3f} "
+                f"| {row['specificity_mean']:.3f} ± {row['specificity_std']:.3f} "
+                f"| {row['flagged_share_mean']:.0%} |"
+            )
+
+    lines += [
+        "",
+        f"For comparison, flagging every patient gives recall 1.00 and precision {n_positive / n_train:.3f} "
+        "(the ICU rate in the training split).",
+    ]
+
+    REPORTS_DIR.mkdir(exist_ok=True)
+    (REPORTS_DIR / "cv_report.md").write_text("\n".join(lines) + "\n")
+
+
+def main():
+
+    X_train, _, y_train, _ = load_split()
+
+    fold_results, oof = run_cv(X_train, y_train)
+
+    summary = summarise(fold_results)
+    top_auc = max(summary, key=lambda name: summary[name]["roc_auc"]["mean"])
+    comparison = paired_comparison(fold_results, top_auc)
+
+    calibrated = [name for name in oof if name.endswith(CALIBRATION_SUFFIX)]
+    uncalibrated = [name for name in oof if name not in calibrated]
+
+    calibration = {name: calibration_summary(y_train, oof[name]) for name in oof}
+    thresholds = {name: threshold_table(y_train, oof[name], RECALL_TARGETS) for name in calibrated}
+
+    figures = REPORTS_DIR / "figures"
+    figures.mkdir(parents=True, exist_ok=True)
+    save_reliability_plot(
+        y_train, {n: oof[n] for n in uncalibrated}, figures / "reliability_oof_uncalibrated.png",
+        title="Reliability, uncalibrated (out-of-fold)",
+    )
+    save_reliability_plot(
+        y_train, {n: oof[n] for n in calibrated}, figures / "reliability_oof_sigmoid.png",
+        title="Reliability, sigmoid-calibrated (out-of-fold)",
+    )
+
+    RESULTS_DIR.mkdir(exist_ok=True)
+    fold_results.to_csv(RESULTS_DIR / "cv_folds.csv", index=False)
+    oof_long(oof, y_train).to_csv(RESULTS_DIR / "cv_oof_predictions.csv", index=False)
+    with open(RESULTS_DIR / "cv_summary.json", "w") as f:
+        json.dump(
+            {
+                "n_splits": N_SPLITS,
+                "n_repeats": N_REPEATS,
+                "n_train": int(len(y_train)),
+                "n_train_positive": int(y_train.sum()),
+                "final_model": FINAL_MODEL,
+                "summary": summary,
+                "highest_mean_roc_auc": top_auc,
+                "paired_comparison_roc_auc": comparison,
+                "calibration": calibration,
+                "thresholds": {name: t.to_dict(orient="records") for name, t in thresholds.items()},
+            },
+            f,
+            indent=2,
+        )
+
+    write_report(summary, top_auc, comparison, len(y_train), int(y_train.sum()), thresholds, calibration)
+
+    print((REPORTS_DIR / "cv_report.md").read_text())
+
+
+if __name__ == "__main__":
+    main()
