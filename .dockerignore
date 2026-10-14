@@ -22,3 +22,8 @@ data/raw/
 .DS_Store
 
 .dev_notes.md
+# Not needed at runtime: the API reads models/ and imports src/ (to unpickle the pipeline)
+data/
+tests/
+results/
+.github/
