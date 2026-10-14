@@ -72,25 +72,18 @@ The dataset contains clinical and laboratory measurements for **385 confirmed CO
 
 ### Final Modeling Dataset
 
-To ensure clinically meaningful prediction and prevent temporal leakage:
+`src/build_dataset.py` builds `data/processed/df_model.csv` from the raw file:
 
-* Only the first observation window (0–2 hours) is used
-* Each patient is represented once
-* The target reflects future ICU admission
-
-The processed dataset (`df_model.csv`) represents a leakage-safe, patient-level dataset used for model training and inference.
+* Only the first observation window (0–2 hours) is used, one row per patient
+* The target is 1 if the patient was admitted to ICU in **any** window
+* **32 patients whose ICU flag is already set in the 0–2 hour window are excluded.** The data provider warns not to use rows where the target is present, because it is unknown whether those measurements were taken before or after ICU admission. Keeping them would leak the outcome into the features.
 
 ### Final Dataset Characteristics
 
-* 385 patients
-* 192 engineered input features after preprocessing and encoding
-* Balanced ICU target distribution
+* 353 patients (385 minus the 32 excluded): 163 admitted to ICU, 190 not
+* 228 candidate input features. Columns with more than 60% missing values are dropped inside the model pipeline, using the training data only. On the full dataset this keeps 192 features (212 after one-hot encoding); all vital-sign columns are dropped because about 70% of patients have no vital signs recorded in the first two hours.
 
-> Note: `df_model.csv` shape is `(385, 194)` including:
->
-> * 192 input features
-> * 1 target column
-> * 1 patient identifier column
+> `df_model.csv` shape is `(353, 230)`: 228 features, 1 target column and 1 patient identifier column.
 
 ---
 
@@ -102,8 +95,8 @@ The project applies a clinically realistic early prediction strategy:
 
 * Restricted analysis to the first observation window (0–2 hours)
 * Constructed a patient-level ICU target
-* Removed post-admission information
-* Prevented temporal and repeated-patient leakage
+* Excluded patients already in ICU during that window, whose measurements may come from after admission
+* One row per patient, so the same patient cannot appear in both training and test data
 
 ### Preprocessing Pipeline
 
@@ -121,7 +114,7 @@ The preprocessing workflow was implemented using reusable Scikit-learn pipelines
 
 ### Feature Engineering
 
-* Removed features with >60% missing values
+* Removed features with >60% missing values, as a pipeline step fitted on the training data only
 * Structured feature groups explicitly
 * Built reusable preprocessing architecture with:
 
@@ -339,6 +332,14 @@ cd icu-covid19-prediction
 pip install -r requirements.txt
 ```
 
+### Rebuild the modelling dataset (optional)
+
+`data/processed/df_model.csv` is committed, so this is only needed after changing `src/build_dataset.py`:
+
+```bash
+python -m src.build_dataset
+```
+
 ### Run ML training pipeline
 
 ```bash
@@ -392,7 +393,7 @@ docker run -p 8501:8501 -p 8000:8000 icu-prediction-app
 * **Code** is released under the [MIT License](LICENSE). The MIT License does not cover the data.
 * **Data** (`data/`) comes from Hospital Sírio-Libanês and is redistributed under its original [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) licence: you may share and adapt it for **non-commercial** purposes, with attribution (see [Dataset source](#dataset-source)).
   * `data/raw/Kaggle_Sirio_Libanes_ICU_Prediction.xlsx` is the source file from Kaggle.
-  * `data/processed/df_model.csv` is a derived file. Changes made: kept only the 0–2 hour window (one row per patient), set the target to whether the patient was admitted to ICU in any window, dropped columns with more than 60% missing values, and removed the `WINDOW` column.
+  * `data/processed/df_model.csv` is a derived file. Changes made (see `src/build_dataset.py`): kept only the 0–2 hour window (one row per patient), excluded the 32 patients already in ICU in that window, set the target to whether the patient was admitted to ICU in any window, and removed the `WINDOW` column.
 
 This repository does not claim ownership of the dataset.
 
