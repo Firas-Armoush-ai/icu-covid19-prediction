@@ -44,6 +44,24 @@ This project focuses on clinically realistic early prediction, following the pri
 
 ## Dataset
 
+### Dataset source
+
+| | |
+| --- | --- |
+| **Name** | COVID-19 – Clinical Data to assess diagnosis |
+| **Provider** | Hospital Sírio-Libanês (Data Intelligence Team), São Paulo and Brasília, Brazil |
+| **Where** | [Kaggle](https://www.kaggle.com/datasets/S%C3%ADrio-Libanes/covid19), version 4, file `Kaggle_Sirio_Libanes_ICU_Prediction.xlsx` (1,925 rows × 231 columns) |
+| **Period covered** | 28 January – 16 April 2020 |
+| **Licence** | [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) (non-commercial use, attribution required) |
+
+The provider publishes no DOI or formal citation. Suggested citation:
+
+> Hospital Sírio-Libanês Data Intelligence Team (2020). *COVID-19 – Clinical Data to assess diagnosis* (version 4) [Data set]. Kaggle. https://www.kaggle.com/datasets/S%C3%ADrio-Libanes/covid19. Licensed under CC BY-NC 4.0.
+
+The provider states that the data were anonymised and that every numeric column was min-max scaled to the range −1 to 1 before publication. See [Licence](#licence) for how the data in this repository may be reused.
+
+### Dataset contents
+
 The dataset contains clinical and laboratory measurements for **385 confirmed COVID-19 patients**, each observed across multiple temporal windows:
 
 * 0–2 hours
@@ -279,11 +297,11 @@ icu-covid19-prediction/
 │   └── utils/
 ├── data/
 │   ├── raw/
-│   ├── processed/
-│   └── README.md
+│   │   └── README.md
+│   └── processed/
 ├── notebooks/
-│   ├── 02_eda_and_data_understanding.ipynb
-│   └── 03_model_experiments.ipynb
+│   ├── 01_eda_and_data_understanding.ipynb
+│   └── 02_model_experiments.ipynb
 ├── src/
 │   ├── __init__.py
 │   ├── config.py
@@ -311,7 +329,7 @@ icu-covid19-prediction/
 ### Clone repository
 
 ```bash
-git clone git@github-ai:Firas-Armoush-ai/icu-covid19-prediction.git
+git clone https://github.com/Firas-Armoush-ai/icu-covid19-prediction.git
 cd icu-covid19-prediction
 ```
 
@@ -369,15 +387,14 @@ docker run -p 8501:8501 -p 8000:8000 icu-prediction-app
 
 ---
 
-## Dataset License
+## Licence
 
-Dataset license:
+* **Code** is released under the [MIT License](LICENSE). The MIT License does not cover the data.
+* **Data** (`data/`) comes from Hospital Sírio-Libanês and is redistributed under its original [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) licence: you may share and adapt it for **non-commercial** purposes, with attribution (see [Dataset source](#dataset-source)).
+  * `data/raw/Kaggle_Sirio_Libanes_ICU_Prediction.xlsx` is the source file from Kaggle.
+  * `data/processed/df_model.csv` is a derived file. Changes made: kept only the 0–2 hour window (one row per patient), set the target to whether the patient was admitted to ICU in any window, dropped columns with more than 60% missing values, and removed the `WINDOW` column.
 
-```text
-CC BY-NC 4.0
-```
-
-This repository does not claim ownership of the original dataset.
+This repository does not claim ownership of the dataset.
 
 ---
 
