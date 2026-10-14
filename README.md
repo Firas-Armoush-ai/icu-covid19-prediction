@@ -5,8 +5,7 @@
 🚀 **Live Demo:**
 https://icu-covid19-prediction.onrender.com/
 
-📘 **API Documentation:**
-https://icu-covid19-prediction.onrender.com/docs
+📘 **API documentation:** the live site serves the Streamlit dashboard only. The FastAPI backend runs privately inside the same container, so its Swagger docs are available when you run the app locally, at http://127.0.0.1:8000/docs (see [Run Application Locally](#run-application-locally)).
 
 ---
 
@@ -257,7 +256,7 @@ The FastAPI backend provides:
 * `GET /model-info`: threshold and held-out test results
 * Validated inputs (allowed age groups, 0/1 flags, values within the provider's −1 to 1 scale)
 * Inference adapter that fills a lab's identical summary columns from one value
-* Automatic Swagger API documentation
+* Automatic Swagger API documentation (local only; the deployed container exposes only the dashboard)
 
 ### Frontend
 
