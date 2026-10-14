@@ -7,6 +7,7 @@ import joblib
 
 from datetime import datetime
 
+from sklearn.base import clone
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
@@ -34,10 +35,7 @@ from .config import (
     EVAL_METRIC
 )
 
-from .preprocessing import (
-    get_feature_columns,
-    build_preprocessor
-)
+from .preprocessing import build_preprocessor
 
 from .plots import (
     save_confusion_matrix,
@@ -86,12 +84,7 @@ def train_models():
     # -------------------------
     # Preprocessing
     # -------------------------
-    numeric_cols, categorical_cols = get_feature_columns(df)
-
-    preprocessor = build_preprocessor(
-        numeric_cols,
-        categorical_cols
-    )
+    preprocessor = build_preprocessor()
 
     # -------------------------
     # Models
@@ -123,7 +116,7 @@ def train_models():
     for name, model in models.items():
 
         pipeline = Pipeline([
-            ("preprocessor", preprocessor),
+            ("preprocessor", clone(preprocessor)),
             ("model", model)
         ])
 
