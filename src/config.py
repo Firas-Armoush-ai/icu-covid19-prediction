@@ -28,6 +28,8 @@ CATEGORICAL_COLS = [
 ]
 
 RAW_DATA_PATH = PROJECT_ROOT / "data" / "raw" / "Kaggle_Sirio_Libanes_ICU_Prediction.xlsx"
+# SHA-256 of the original file as downloaded from Kaggle (version 4); tests check it
+RAW_DATA_SHA256 = "325889ae11b45a156ba71afad498f0eff5726c9abd1f411afca1865aafd8ebd1"
 DATA_PATH = PROJECT_ROOT / "data" / "processed" / "df_model.csv"
 
 # Columns with a larger share of missing values (in the training data) are dropped

@@ -1,5 +1,7 @@
 """The modelling dataset uses only the 0-2 h window, one row per patient."""
 
+import hashlib
+
 import pandas as pd
 import pytest
 
@@ -9,6 +11,7 @@ from src.config import (
     EARLY_WINDOW,
     ID_COL,
     RAW_DATA_PATH,
+    RAW_DATA_SHA256,
     TARGET_COL,
     WINDOW_COL,
 )
@@ -75,3 +78,9 @@ def test_real_dataset_shape(real):
 def test_committed_csv_matches_rebuild(real):
     committed = pd.read_csv(DATA_PATH)
     pd.testing.assert_frame_equal(committed, real, check_dtype=False)
+
+
+def test_raw_file_is_the_kaggle_original():
+    """Guards against accidental edits (e.g. opening and re-saving the file in Excel)."""
+    digest = hashlib.sha256(RAW_DATA_PATH.read_bytes()).hexdigest()
+    assert digest == RAW_DATA_SHA256

@@ -1,8 +1,12 @@
 # Raw data
 
-`Kaggle_Sirio_Libanes_ICU_Prediction.xlsx` is the source file from the
+`Kaggle_Sirio_Libanes_ICU_Prediction.xlsx` is the original, unmodified file from the
 Hospital Sírio-Libanês **COVID-19 – Clinical Data to assess diagnosis** dataset
-(Kaggle, version 4).
+(Kaggle, version 4), as extracted from the Kaggle download.
+
+* SHA-256: `325889ae11b45a156ba71afad498f0eff5726c9abd1f411afca1865aafd8ebd1`
+  (`tests/test_build_dataset.py` checks it). Don't open and re-save it in Excel:
+  that changes the file even when no value is edited.
 
 * Source: https://www.kaggle.com/datasets/S%C3%ADrio-Libanes/covid19
 * Licence: [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/). Non-commercial use only, with attribution. The repository's MIT License covers the code, not this data.
