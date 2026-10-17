@@ -21,8 +21,9 @@ from sklearn.metrics import (
 from sklearn.model_selection import RepeatedStratifiedKFold
 
 from .calibration import calibration_summary, save_reliability_plot
-from .config import BASELINE_MODEL, FINAL_MODEL, PROJECT_ROOT, RANDOM_STATE
+from .config import BASELINE_MODEL, FINAL_MODEL, PROJECT_ROOT, RANDOM_STATE, RECALL_TARGET
 from .models import CALIBRATION_SUFFIX, CANDIDATES, build_model, load_split
+from .plots import save_calibration_before_after, save_model_comparison, save_threshold_tradeoff
 from .threshold import threshold_table
 
 N_SPLITS = 5
@@ -41,6 +42,9 @@ METRIC_LABELS = {
 
 # Recall targets shown in the report, to choose the decision threshold from
 RECALL_TARGETS = [0.80, 0.85, 0.90, 0.95]
+
+# Finer grid for the threshold trade-off figure
+TRADEOFF_TARGETS = [round(t, 2) for t in np.arange(0.70, 1.0001, 0.01)]
 
 RESULTS_DIR = PROJECT_ROOT / "results"
 REPORTS_DIR = PROJECT_ROOT / "reports"
@@ -193,6 +197,8 @@ def write_report(summary, top_auc, comparison, baseline, n_train, n_positive, th
 
     lines += [
         "",
+        "Every candidate's fold-by-fold ROC-AUC is plotted in `reports/figures/cv_model_comparison.png`.",
+        "",
         f"Per-fold ROC-AUC difference between the candidate with the highest mean ROC-AUC "
         f"(**{top_auc}**) and each other candidate:",
         "",
@@ -235,8 +241,9 @@ def write_report(summary, top_auc, comparison, baseline, n_train, n_positive, th
         "",
         f"Reference Brier score for always predicting the ICU rate: "
         f"{next(iter(calibration.values()))['brier_reference']:.3f} (lower is better). "
-        "Reliability curves: `reports/figures/reliability_oof_uncalibrated.png` and "
-        "`reports/figures/reliability_oof_sigmoid.png`.",
+        "Reliability curves: `reports/figures/reliability_oof_uncalibrated.png`, "
+        "`reports/figures/reliability_oof_sigmoid.png`, and the final model before and after "
+        "calibration in `reports/figures/calibration_before_after.png`.",
         "",
         "## Precision at recall targets (calibrated models)",
         "",
@@ -260,7 +267,8 @@ def write_report(summary, top_auc, comparison, baseline, n_train, n_positive, th
     lines += [
         "",
         f"For comparison, flagging every patient gives recall 1.00 and precision {n_positive / n_train:.3f} "
-        "(the ICU rate in the training split).",
+        "(the ICU rate in the training split). The trade-off across recall targets from 0.70 to 1.00 "
+        "is plotted in `reports/figures/threshold_tradeoff.png`.",
     ]
 
     REPORTS_DIR.mkdir(exist_ok=True)
@@ -294,6 +302,22 @@ def main():
         y_train, {n: oof[n] for n in calibrated}, figures / "reliability_oof_sigmoid.png",
         title="Reliability, sigmoid-calibrated (out-of-fold)",
     )
+
+    # Figures for the README and the dashboard
+    save_model_comparison(fold_results, FINAL_MODEL, BASELINE_MODEL, figures / "cv_model_comparison.png")
+    save_threshold_tradeoff(
+        threshold_table(y_train, oof[FINAL_MODEL], TRADEOFF_TARGETS),
+        RECALL_TARGET,
+        float(y_train.mean()),
+        figures / "threshold_tradeoff.png",
+    )
+    if FINAL_MODEL.endswith(CALIBRATION_SUFFIX):
+        before = FINAL_MODEL[: -len(CALIBRATION_SUFFIX)]
+        save_calibration_before_after(
+            y_train, oof[before], oof[FINAL_MODEL],
+            (calibration[before], calibration[FINAL_MODEL]),
+            figures / "calibration_before_after.png",
+        )
 
     RESULTS_DIR.mkdir(exist_ok=True)
     fold_results.to_csv(RESULTS_DIR / "cv_folds.csv", index=False)

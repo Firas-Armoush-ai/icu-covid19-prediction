@@ -30,6 +30,9 @@ dependencies = [
     "scikit-learn==1.8.0",
     "joblib==1.5.3",
     "pydantic==2.13.4",
+    # Not imported directly (FastAPI and Streamlit both run on it), but pinned:
+    # Starlette 1.8.0 breaks Streamlit 1.57's image serving (HTTP 500 on PNGs).
+    "starlette==1.7.0",
 ]
 
 [project.optional-dependencies]

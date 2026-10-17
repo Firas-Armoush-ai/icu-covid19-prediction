@@ -219,10 +219,7 @@ def train_final():
     # 5. Report and figures
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
     save_roc_curve(y_test, proba, FIGURES_DIR / "roc_test.png", title="ROC curve, test set")
-    save_confusion_matrix(
-        y_test, (proba >= threshold).astype(int), FIGURES_DIR / "cm_test.png",
-        title=f"Test set at threshold {threshold:.3f}",
-    )
+    save_confusion_matrix(y_test, (proba >= threshold).astype(int), FIGURES_DIR / "cm_test.png", threshold)
     top_features = save_feature_importance(model, FIGURES_DIR / "fi_top20.png")
     baseline = baseline_on_test(X_train, y_train, X_test, y_test, proba)
     write_test_report(test, cv_at_threshold, top_features, baseline)

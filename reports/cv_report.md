@@ -22,6 +22,8 @@ Values are mean ± standard deviation across folds. The standard deviation shows
 | xgboost+sigmoid | 0.709 ± 0.067 | 0.661 ± 0.078 | 0.575 ± 0.088 | 0.644 ± 0.075 | 0.603 ± 0.064 |
 | age_only (baseline) | 0.701 ± 0.066 | 0.654 ± 0.075 | 0.572 ± 0.072 | 0.617 ± 0.089 | 0.591 ± 0.066 |
 
+Every candidate's fold-by-fold ROC-AUC is plotted in `reports/figures/cv_model_comparison.png`.
+
 Per-fold ROC-AUC difference between the candidate with the highest mean ROC-AUC (**xgboost+sigmoid**) and each other candidate:
 
 | Compared with | Mean difference | SD of difference | Folds where it is higher |
@@ -51,7 +53,7 @@ Out-of-fold probabilities, per repeat, summarised. A slope near 1 and an interce
 | xgboost+sigmoid | 0.222 ± 0.004 | 1.32 ± 0.25 | +0.02 | 0.466 vs 0.461 |
 | age_only (baseline) | 0.221 ± 0.001 | 0.95 ± 0.03 | -0.01 | 0.462 vs 0.461 |
 
-Reference Brier score for always predicting the ICU rate: 0.248 (lower is better). Reliability curves: `reports/figures/reliability_oof_uncalibrated.png` and `reports/figures/reliability_oof_sigmoid.png`.
+Reference Brier score for always predicting the ICU rate: 0.248 (lower is better). Reliability curves: `reports/figures/reliability_oof_uncalibrated.png`, `reports/figures/reliability_oof_sigmoid.png`, and the final model before and after calibration in `reports/figures/calibration_before_after.png`.
 
 ## Precision at recall targets (calibrated models)
 
@@ -72,4 +74,4 @@ For each target, a threshold is chosen in every repeat from that repeat's out-of
 | xgboost+sigmoid | 0.90 | 0.344 | 0.536 ± 0.020 | 0.331 ± 0.054 | 78% |
 | xgboost+sigmoid | 0.95 | 0.304 | 0.504 ± 0.021 | 0.194 ± 0.066 | 87% |
 
-For comparison, flagging every patient gives recall 1.00 and precision 0.461 (the ICU rate in the training split).
+For comparison, flagging every patient gives recall 1.00 and precision 0.461 (the ICU rate in the training split). The trade-off across recall targets from 0.70 to 1.00 is plotted in `reports/figures/threshold_tradeoff.png`.

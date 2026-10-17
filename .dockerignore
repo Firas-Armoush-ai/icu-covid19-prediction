@@ -12,6 +12,8 @@ venv/
 notebooks/
 
 reports/
+# ...except the figures, which the dashboard's evaluation page shows
+!reports/figures/
 
 data/raw/
 
