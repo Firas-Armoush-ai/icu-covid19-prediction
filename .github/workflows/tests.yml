@@ -22,6 +22,7 @@ jobs:
           cache: pip
           cache-dependency-path: |
             requirements.txt
+            requirements-train.txt
             requirements-dev.txt
 
       - name: Install dependencies
@@ -31,3 +32,26 @@ jobs:
 
       - name: Run tests
         run: pytest
+
+  runtime-deps:
+    # The Docker image installs only requirements.txt; check that is enough
+    # to load the saved model and import the API and dashboard dependencies.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install runtime dependencies only
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Load the model and import the app
+        run: |
+          python -c "import app.api.main as api; print(api.METADATA['model'], api.THRESHOLD)"
+          python -c "import streamlit, requests; print('dashboard dependencies OK')"

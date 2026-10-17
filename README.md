@@ -355,7 +355,8 @@ icu-covid19-prediction/
 ├── tests/                       # pytest suite
 ├── .github/workflows/tests.yml  # CI
 ├── run.py                       # runs src/train.py
-├── requirements.txt
+├── requirements.txt             # runtime only (Docker)
+├── requirements-train.txt       # + training, plotting, notebooks
 ├── requirements-dev.txt         # + pytest, httpx2
 ├── Dockerfile
 ├── start.sh
@@ -385,7 +386,11 @@ conda activate icu-covid19
 pip install -r requirements-dev.txt
 ```
 
-`requirements.txt` alone is enough to run the app; `requirements-dev.txt` adds the test tools.
+Three requirement files, each building on the previous one:
+
+* `requirements.txt`: what the deployed app needs (the Docker image installs only this)
+* `requirements-train.txt`: adds XGBoost, plotting and notebook packages for training and evaluation
+* `requirements-dev.txt`: adds pytest
 
 ### Rebuild the modelling dataset (optional)
 
