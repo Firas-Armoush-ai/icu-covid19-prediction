@@ -348,13 +348,14 @@ icu-covid19-prediction/
 ├── reports/
 │   ├── cv_report.md             # model comparison, calibration, thresholds
 │   ├── evaluation_test.md       # final test-set evaluation
+│   ├── project_summary.md       # one-page summary
 │   └── figures/
 ├── results/                     # CV results (JSON, per-fold CSV)
 ├── src/
 │   ├── config.py                # paths, seeds, final model, recall target
 │   ├── build_dataset.py         # raw file -> patient-level dataset
 │   ├── preprocessing.py         # pipeline incl. missing-column filter
-│   ├── models.py                # candidate models, train/test split
+│   ├── models.py                # candidate models, age-only baseline, train/test split
 │   ├── cross_validate.py        # repeated CV on the training split
 │   ├── threshold.py             # recall-targeted threshold
 │   ├── calibration.py           # Brier score, slope, reliability curves
