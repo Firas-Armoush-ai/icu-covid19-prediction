@@ -4,9 +4,11 @@ on:
   push:
   pull_request:
 
+# Runners are pinned to an Ubuntu LTS so CI doesn't change under us when
+# ubuntu-latest moves to a new release; upgrade deliberately.
 jobs:
   pytest:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -14,9 +16,9 @@ jobs:
         python-version: ["3.12", "3.13"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -35,11 +37,11 @@ jobs:
     # check that is enough to load the saved model and import the API and
     # dashboard, and that it installs the library versions the model was
     # trained with.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
