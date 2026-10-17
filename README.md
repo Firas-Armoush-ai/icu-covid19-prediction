@@ -81,6 +81,14 @@ The dataset contains clinical and laboratory measurements for **385 confirmed CO
 * The target is 1 if the patient was admitted to ICU in **any** window
 * **32 patients whose ICU flag is already set in the 0–2 hour window are excluded.** The data provider warns not to use rows where the target is present, because it is unknown whether those measurements were taken before or after ICU admission. Keeping them would leak the outcome into the features.
 
+```mermaid
+flowchart LR
+    A["385 patients<br/>5 time windows each"] --> B["32 excluded<br/>already in ICU at 0–2 h"]
+    A --> C["353 patients<br/>163 later admitted to ICU<br/>190 never admitted"]
+    C --> D["Training split: 282 (130 ICU)<br/>model choice, threshold"]
+    C --> E["Test split: 71 (33 ICU)<br/>used once, at the end"]
+```
+
 ### Final Dataset Characteristics
 
 * 353 patients (385 minus the 32 excluded): 163 admitted to ICU, 190 not
@@ -164,6 +172,10 @@ Each model uses library defaults (no hyperparameter tuning) and is evaluated bot
 * **Uncalibrated models are badly overconfident.** Calibration slopes of 0.14–0.31 (ideal: 1), and Brier scores of 0.235–0.252, close to the 0.248 of always predicting the ICU rate. Sigmoid calibration brings the slopes to 1.14–1.32 and the Brier scores to 0.222–0.236.
 * **Age alone does as well.** Logistic regression on the age group alone reaches ROC-AUC 0.701 and the lowest Brier score (0.221). The final model is level with it (per-fold difference −0.006, SD 0.059, higher in 54% of folds): in the first two hours, the labs and comorbidities add no measurable discrimination beyond age.
 
+![Cross-validated ROC-AUC per model across 50 folds: the models overlap and the age-only baseline does as well](reports/figures/cv_model_comparison.png)
+
+![Calibration of the random forest before and after sigmoid calibration: slope 0.24 before, 1.17 after](reports/figures/calibration_before_after.png)
+
 What the 90% recall target costs (final model, out-of-fold):
 
 | Recall target | Threshold | Precision | Specificity | Patients flagged |
@@ -174,6 +186,8 @@ What the 90% recall target costs (final model, out-of-fold):
 | 0.95 | 0.278 | 0.485 | 0.132 | 91% |
 
 Flagging every patient would give precision 0.461.
+
+![Precision, specificity and share of patients flagged at each recall target, with the 90% choice marked](reports/figures/threshold_tradeoff.png)
 
 ### Held-out test set (final model, threshold 0.352)
 
@@ -190,6 +204,8 @@ Flagging every patient would give precision 0.461.
 | F1 | 0.635 | 0.507 – 0.739 | — |
 
 At the threshold the model caught **27 of 33** ICU patients, missed 6, and flagged 52 of 71 patients (73%). For reference, the Brier score of always predicting the test set's ICU rate is 0.249.
+
+<img src="reports/figures/cm_test.png" width="520" alt="Test-set confusion matrix at threshold 0.352: 27 caught, 6 missed, 25 false alarms, 13 correctly cleared">
 
 **Reading these results:** the test results agree with cross-validation within their (wide) intervals, at the lower end. With 71 test patients, the ROC-AUC interval reaches down to about 0.5. Data from the first two hours carries limited signal, most of it in age: the model works as a cautious screen that rules out about a third of patients who will not need ICU, not as a confident predictor.
 
@@ -244,7 +260,7 @@ Three data findings shaped the work:
 * Fixed seeds throughout: re-running the pipeline reproduces the same model file byte for byte
 * Model saved to a fixed path (`models/icu_model.joblib`) with `models/model_metadata.json`: decision threshold, feature columns, cross-validation and test results, library versions
 * The API and dashboard read the threshold from that metadata, so labels always match the evaluated model
-* pytest tests (dataset build, preprocessing, threshold and calibration helpers, age-only baseline, model loading, API contract including a check that every dashboard input changes the estimate), run by GitHub Actions on Python 3.12 and 3.13 for every push and pull request
+* pytest tests (dataset build, preprocessing, threshold and calibration helpers, age-only baseline, model loading, API contract including a check that every dashboard input changes the estimate, both dashboard pages and their charts), run by GitHub Actions on Python 3.12 and 3.13 for every push and pull request
 
 ---
 
@@ -275,6 +291,7 @@ The Streamlit frontend provides:
 * Inputs: age group, gender, hypertension, immunocompromised status, and the five lab results the model relies on most (lymphocytes, C-reactive protein, platelets, urea, neutrophils)
 * Calibrated probability and a flag based on the model's saved threshold
 * An explanation of the threshold and its test-set performance
+* A second page, **How the model was evaluated**, with the patient selection diagram and the charts above (model comparison, calibration, threshold trade-off, test confusion matrix), read from `reports/figures` so it always matches the deployed model
 * Deployment-safe API configuration
 
 ### Inference Flow
@@ -337,6 +354,9 @@ icu-covid19-prediction/
 ├── app/
 │   ├── api/main.py              # FastAPI: /predict, /model-info
 │   ├── frontend/                # Streamlit dashboard
+│   │   ├── streamlit_app.py     # entry point: navigation, shared sidebar
+│   │   ├── predict.py           # page 1: risk estimate
+│   │   └── evaluation.py        # page 2: how the model was evaluated
 │   └── utils/inference.py       # user input -> training schema
 ├── data/
 │   ├── raw/                     # source file from Kaggle + README
@@ -349,7 +369,7 @@ icu-covid19-prediction/
 │   ├── cv_report.md             # model comparison, calibration, thresholds
 │   ├── evaluation_test.md       # final test-set evaluation
 │   ├── project_summary.md       # one-page summary
-│   └── figures/
+│   └── figures/                 # charts shown in this README and on the dashboard
 ├── results/                     # CV results (JSON, per-fold CSV)
 ├── src/
 │   ├── config.py                # paths, seeds, final model, recall target
