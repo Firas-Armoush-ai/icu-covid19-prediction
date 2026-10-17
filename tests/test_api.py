@@ -3,19 +3,12 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from app.api.main import THRESHOLD, app
+from app.api.main import THRESHOLD, PatientData, app
 
-EXAMPLE_PATIENT = {
-    "AGE_PERCENTIL": "70th",
-    "GENDER": 0,
-    "HTN": 1,
-    "IMMUNOCOMPROMISED": 0,
-    "ALBUMIN_MEDIAN": 0.263,
-    "BE_ARTERIAL_MEDIAN": -1.0,
-    "PCR_MEDIAN": -0.958,
-    "UREA_MEDIAN": -0.880,
-    "CREATININ_MEDIAN": -0.924,
-}
+# The schema's own example: patient 164 from the training split.
+EXAMPLE_PATIENT = PatientData.model_config["json_schema_extra"]["example"]
+
+LAB_INPUTS = [name for name in PatientData.model_fields if name.endswith("_MEDIAN")]
 
 LABELS = {1: "Flag for ICU review", 0: "Below review threshold"}
 
@@ -59,10 +52,14 @@ def test_predict_accepts_empty_payload(client):
     assert response.status_code == 200
 
 
-def test_lab_input_changes_the_estimate(client):
-    low = predict(client, UREA_MEDIAN=-1.0)["icu_probability"]
-    high = predict(client, UREA_MEDIAN=1.0)["icu_probability"]
-    assert low != high
+@pytest.mark.parametrize("lab", LAB_INPUTS)
+def test_every_lab_input_changes_the_estimate(client, lab):
+    # Guards against dashboard inputs the model ignores.
+    estimates = {
+        predict(client, **{lab: value})["icu_probability"]
+        for value in (-1.0, -0.5, 0.0, 0.5, 1.0)
+    }
+    assert len(estimates) > 1
 
 
 def test_age_group_changes_the_estimate(client):

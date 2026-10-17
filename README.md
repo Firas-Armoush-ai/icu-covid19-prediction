@@ -158,7 +158,7 @@ Each model uses library defaults (no hyperparameter tuning) and is evaluated bot
 | xgboost+sigmoid | 0.709 ± 0.067 | 0.661 ± 0.078 | 0.222 ± 0.004 | 1.32 ± 0.25 |
 
 * **Discrimination is similar across models.** The differences in ROC-AUC are smaller than the fold-to-fold spread.
-* **Uncalibrated models are badly overconfident.** Calibration slopes of 0.14–0.31 (ideal: 1) and Brier scores no better than always predicting the ICU rate (0.248). Sigmoid calibration fixes this.
+* **Uncalibrated models are badly overconfident.** Calibration slopes of 0.14–0.31 (ideal: 1), and Brier scores of 0.235–0.252, close to the 0.248 of always predicting the ICU rate. Sigmoid calibration brings the slopes to 1.14–1.32 and the Brier scores to 0.222–0.236.
 
 What the 90% recall target costs (final model, out-of-fold):
 
@@ -197,9 +197,9 @@ At the threshold the model caught **27 of 33** ICU patients, missed 6, and flagg
 
 **Random Forest with sigmoid calibration**, chosen from cross-validation before the test set was used:
 
-* Discrimination is statistically indistinguishable across candidates, so it does not decide the choice
-* Best calibration slope among the calibrated models (1.17), with a Brier score close to the best (0.225 vs 0.222)
-* Precision and specificity at each recall target are level with XGBoost + sigmoid
+* Discrimination does not decide the choice: the differences in ROC-AUC are small next to the fold-to-fold spread (XGBoost + sigmoid is ahead by 0.014 on average, SD 0.034 across folds)
+* Well calibrated: slope 1.17, intercept 0.00, Brier score 0.225 (best: XGBoost + sigmoid, 0.222, with slope 1.32). Logistic + sigmoid has a slope slightly closer to 1 (1.14) but a worse Brier score (0.236), lower ROC-AUC and lower precision at every recall target
+* At the 0.90 recall target, precision and specificity are level with XGBoost + sigmoid (0.539 / 0.340 vs 0.536 / 0.331); XGBoost + sigmoid is better only at the 0.95 target
 * Needs only scikit-learn at inference time
 
 Choosing among six candidates on the same cross-validation slightly flatters the winner; the single test-set evaluation is the unbiased check.
@@ -220,10 +220,11 @@ What the model relies on most (impurity-based importances, summed per measuremen
 
 These are associations the model uses, not causal effects; they are consistent with commonly reported markers of COVID-19 severity.
 
-Two data findings shaped the work:
+Three data findings shaped the work:
 
 * **32 patients were already in ICU during the first window.** Their measurements may have been taken after admission, so they were excluded.
 * **At 0–2 hours, each lab is effectively one value.** Its MEAN, MEDIAN, MIN and MAX columns are identical copies and its DIFF column is constant, so the 192 columns the model keeps are 36 lab measurements (five columns each) plus 12 demographic and comorbidity fields. The API fills all copies from the single value a user enters.
+* **Some kept labs carry no signal.** Arterial base excess has a single value across all patients, and albumin only seven, so the model gives them almost no weight. The dashboard therefore asks for the five labs the model relies on most, and a test checks that every lab input changes the estimate.
 
 ---
 
@@ -263,7 +264,7 @@ The FastAPI backend provides:
 The Streamlit frontend provides:
 
 * Interactive ICU risk dashboard
-* Inputs limited to what the model uses (age group, comorbidities, five lab values)
+* Inputs: age group, gender, hypertension, immunocompromised status, and the five lab results the model relies on most (lymphocytes, C-reactive protein, platelets, urea, neutrophils)
 * Calibrated probability and a flag based on the model's saved threshold
 * An explanation of the threshold and its test-set performance
 * Deployment-safe API configuration
@@ -474,7 +475,7 @@ This repository does not claim ownership of the dataset.
 * **One hospital group, early 2020.** Hospital Sírio-Libanês sites in São Paulo and Brasília, 28 January – 16 April 2020: before vaccines, later variants and changes in treatment. Performance elsewhere or today is unknown.
 * **Modest signal in the first two hours.** At the 90% recall target the model still flags about three in four patients.
 * **Pre-scaled inputs.** The provider scaled every numeric value to −1 to 1 and did not publish the scaling, so the model cannot take raw clinical values (for example urea in mg/dL), and GENDER is a 0/1 code whose meaning is not documented.
-* **Demo inputs are partial.** The dashboard sets age group, gender, two comorbidity flags and five lab values; the model's other inputs are filled with typical values from the training data.
+* **Demo inputs are partial.** The dashboard sets age group, gender, two comorbidity flags and the five most important lab values; the model's other inputs are filled with typical values from the training data.
 * **No vital signs.** About 70% of patients had none recorded in the first two hours, so the model drops them.
 * **Not a clinical tool.** Educational and portfolio project; it has not been validated for clinical use and must not be used to make care decisions.
 
