@@ -49,8 +49,8 @@ st.sidebar.warning(
 )
 
 st.sidebar.caption(
-    "🧪 Default values are an example patient profile "
-    "from the dataset."
+    "🧪 Default values are one patient from the training "
+    "data (first two hours), who was later admitted to ICU."
 )
 
 st.sidebar.divider()
@@ -143,50 +143,25 @@ with st.form("prediction_form"):
 
     st.caption(
         "Scaled laboratory values (-1 to +1, as published by the "
-        "data provider). These five are sent as entered; the model's "
-        "other lab results are filled with typical values from the "
-        "training data."
+        "data provider). These are the five lab results the model "
+        "relies on most; its other lab results are filled with typical "
+        "values from the training data."
     )
 
-    albumin = st.slider(
-        "Albumin",
-        min_value=-1.0,
-        max_value=1.0,
-        value=0.263,
-        step=0.01
-    )
+    def lab_slider(label, default):
+        return st.slider(
+            label,
+            min_value=-1.0,
+            max_value=1.0,
+            value=default,
+            step=0.01
+        )
 
-    pcr = st.slider(
-        "C-reactive protein (PCR)",
-        min_value=-1.0,
-        max_value=1.0,
-        value=-0.958,
-        step=0.01
-    )
-
-    urea = st.slider(
-        "Urea",
-        min_value=-1.0,
-        max_value=1.0,
-        value=-0.880,
-        step=0.01
-    )
-
-    creatinin = st.slider(
-        "Creatinine",
-        min_value=-1.0,
-        max_value=1.0,
-        value=-0.924,
-        step=0.01
-    )
-
-    be_arterial = st.slider(
-        "Arterial base excess",
-        min_value=-1.0,
-        max_value=1.0,
-        value=-1.0,
-        step=0.01
-    )
+    linfocitos = lab_slider("Lymphocytes", -0.803)
+    pcr = lab_slider("C-reactive protein (PCR)", -0.791)
+    platelets = lab_slider("Platelets", -0.704)
+    urea = lab_slider("Urea", -0.836)
+    neutrophils = lab_slider("Neutrophils", -0.853)
 
     st.caption(
         "Vital signs are not inputs: about 70% of patients had none "
@@ -210,11 +185,11 @@ if submitted:
         "GENDER": gender,
         "HTN": yes_no_to_int(htn),
         "IMMUNOCOMPROMISED": yes_no_to_int(immuno),
-        "ALBUMIN_MEDIAN": albumin,
-        "BE_ARTERIAL_MEDIAN": be_arterial,
+        "LINFOCITOS_MEDIAN": linfocitos,
         "PCR_MEDIAN": pcr,
+        "PLATELETS_MEDIAN": platelets,
         "UREA_MEDIAN": urea,
-        "CREATININ_MEDIAN": creatinin,
+        "NEUTROPHILES_MEDIAN": neutrophils,
     }
 
     try:

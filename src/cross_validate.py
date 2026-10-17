@@ -21,7 +21,7 @@ from sklearn.metrics import (
 from sklearn.model_selection import RepeatedStratifiedKFold
 
 from .calibration import calibration_summary, save_reliability_plot
-from .config import FINAL_MODEL, PROJECT_ROOT, RANDOM_STATE
+from .config import BASELINE_MODEL, FINAL_MODEL, PROJECT_ROOT, RANDOM_STATE
 from .models import CALIBRATION_SUFFIX, CANDIDATES, build_model, load_split
 from .threshold import threshold_table
 
@@ -153,10 +153,14 @@ def oof_long(oof, y):
 
 
 def label(name):
-    return f"{name} (final)" if name == FINAL_MODEL else name
+    if name == FINAL_MODEL:
+        return f"{name} (final)"
+    if name == BASELINE_MODEL:
+        return f"{name} (baseline)"
+    return name
 
 
-def write_report(summary, top_auc, comparison, n_train, n_positive, thresholds, calibration):
+def write_report(summary, top_auc, comparison, baseline, n_train, n_positive, thresholds, calibration):
 
     lines = [
         "# Cross-validation report",
@@ -169,6 +173,10 @@ def write_report(summary, top_auc, comparison, n_train, n_positive, thresholds, 
         "",
         "Each model is evaluated as it is and with sigmoid (Platt) calibration (`+sigmoid`). "
         "All models use library defaults; there is no hyperparameter tuning.",
+        "",
+        f"`{BASELINE_MODEL}` is a one-feature baseline on the same folds: logistic regression on the "
+        "age group alone, coded 0 (10th percentile) to 9 (above 90th). It is not a candidate for the "
+        "final model; it shows how much the other features add beyond age.",
         "",
         "Values are mean ± standard deviation across folds. The standard deviation shows how much "
         "results move between folds; it is not a confidence interval, because folds share training data.",
@@ -199,6 +207,12 @@ def write_report(summary, top_auc, comparison, n_train, n_positive, thresholds, 
         )
 
     lines += [
+        "",
+        "### Final model vs the age-only baseline",
+        "",
+        f"Per-fold ROC-AUC, {FINAL_MODEL} minus {BASELINE_MODEL}: mean difference "
+        f"{baseline['mean_difference']:+.3f} (SD {baseline['std_difference']:.3f}); the final model "
+        f"is higher in {baseline['share_of_folds_reference_is_higher']:.0%} of folds.",
         "",
         "## Calibration",
         "",
@@ -257,14 +271,15 @@ def main():
 
     X_train, _, y_train, _ = load_split()
 
-    fold_results, oof = run_cv(X_train, y_train)
+    fold_results, oof = run_cv(X_train, y_train, candidates=CANDIDATES + [BASELINE_MODEL])
 
     summary = summarise(fold_results)
-    top_auc = max(summary, key=lambda name: summary[name]["roc_auc"]["mean"])
+    top_auc = max(CANDIDATES, key=lambda name: summary[name]["roc_auc"]["mean"])
     comparison = paired_comparison(fold_results, top_auc)
+    baseline = paired_comparison(fold_results, FINAL_MODEL)[BASELINE_MODEL]
 
-    calibrated = [name for name in oof if name.endswith(CALIBRATION_SUFFIX)]
-    uncalibrated = [name for name in oof if name not in calibrated]
+    calibrated = [name for name in CANDIDATES if name.endswith(CALIBRATION_SUFFIX)]
+    uncalibrated = [name for name in CANDIDATES if name not in calibrated]
 
     calibration = {name: calibration_summary(y_train, oof[name]) for name in oof}
     thresholds = {name: threshold_table(y_train, oof[name], RECALL_TARGETS) for name in calibrated}
@@ -294,6 +309,8 @@ def main():
                 "summary": summary,
                 "highest_mean_roc_auc": top_auc,
                 "paired_comparison_roc_auc": comparison,
+                "baseline_model": BASELINE_MODEL,
+                "final_vs_baseline_roc_auc": baseline,
                 "calibration": calibration,
                 "thresholds": {name: t.to_dict(orient="records") for name, t in thresholds.items()},
             },
@@ -301,7 +318,10 @@ def main():
             indent=2,
         )
 
-    write_report(summary, top_auc, comparison, len(y_train), int(y_train.sum()), thresholds, calibration)
+    write_report(
+        summary, top_auc, comparison, baseline,
+        len(y_train), int(y_train.sum()), thresholds, calibration,
+    )
 
     print((REPORTS_DIR / "cv_report.md").read_text())
 

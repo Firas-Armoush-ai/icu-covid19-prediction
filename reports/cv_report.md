@@ -6,6 +6,8 @@ Repeated stratified 5-fold cross-validation, 10 repeats (50 folds), on the train
 
 Each model is evaluated as it is and with sigmoid (Platt) calibration (`+sigmoid`). All models use library defaults; there is no hyperparameter tuning.
 
+`age_only` is a one-feature baseline on the same folds: logistic regression on the age group alone, coded 0 (10th percentile) to 9 (above 90th). It is not a candidate for the final model; it shows how much the other features add beyond age.
+
 Values are mean ± standard deviation across folds. The standard deviation shows how much results move between folds; it is not a confidence interval, because folds share training data.
 
 ## Discrimination
@@ -18,16 +20,22 @@ Values are mean ± standard deviation across folds. The standard deviation shows
 | logistic+sigmoid | 0.667 ± 0.083 | 0.653 ± 0.086 | 0.292 ± 0.113 | 0.685 ± 0.154 | 0.398 ± 0.119 |
 | random_forest+sigmoid (final) | 0.695 ± 0.064 | 0.627 ± 0.073 | 0.593 ± 0.089 | 0.652 ± 0.078 | 0.616 ± 0.064 |
 | xgboost+sigmoid | 0.709 ± 0.067 | 0.661 ± 0.078 | 0.575 ± 0.088 | 0.644 ± 0.075 | 0.603 ± 0.064 |
+| age_only (baseline) | 0.701 ± 0.066 | 0.654 ± 0.075 | 0.572 ± 0.072 | 0.617 ± 0.089 | 0.591 ± 0.066 |
 
 Per-fold ROC-AUC difference between the candidate with the highest mean ROC-AUC (**xgboost+sigmoid**) and each other candidate:
 
 | Compared with | Mean difference | SD of difference | Folds where it is higher |
 | --- | --- | --- | --- |
+| age_only | +0.008 | 0.064 | 68% |
 | logistic | +0.029 | 0.055 | 68% |
 | logistic+sigmoid | +0.042 | 0.058 | 70% |
 | random_forest | +0.023 | 0.035 | 74% |
 | random_forest+sigmoid | +0.014 | 0.034 | 74% |
 | xgboost | +0.014 | 0.022 | 74% |
+
+### Final model vs the age-only baseline
+
+Per-fold ROC-AUC, random_forest+sigmoid minus age_only: mean difference -0.006 (SD 0.059); the final model is higher in 54% of folds.
 
 ## Calibration
 
@@ -41,6 +49,7 @@ Out-of-fold probabilities, per repeat, summarised. A slope near 1 and an interce
 | logistic+sigmoid | 0.236 ± 0.003 | 1.14 ± 0.32 | +0.04 | 0.458 vs 0.461 |
 | random_forest+sigmoid (final) | 0.225 ± 0.004 | 1.17 ± 0.22 | +0.00 | 0.465 vs 0.461 |
 | xgboost+sigmoid | 0.222 ± 0.004 | 1.32 ± 0.25 | +0.02 | 0.466 vs 0.461 |
+| age_only (baseline) | 0.221 ± 0.001 | 0.95 ± 0.03 | -0.01 | 0.462 vs 0.461 |
 
 Reference Brier score for always predicting the ICU rate: 0.248 (lower is better). Reliability curves: `reports/figures/reliability_oof_uncalibrated.png` and `reports/figures/reliability_oof_sigmoid.png`.
 

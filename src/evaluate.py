@@ -72,6 +72,36 @@ def bootstrap_ci(y_true, proba, threshold, n_bootstrap=N_BOOTSTRAP, seed=BOOTSTR
     }
 
 
+def paired_bootstrap_difference(y_true, proba_a, proba_b, metric=roc_auc_score,
+                                n_bootstrap=N_BOOTSTRAP, seed=BOOTSTRAP_SEED):
+    """
+    metric(a) - metric(b) on the test set, with a 95% percentile interval.
+
+    Both models are scored on the same resampled patients in every
+    resample, so the interval reflects the difference itself rather than
+    the two models' separate uncertainties.
+    """
+
+    y_true = np.asarray(y_true)
+    proba_a = np.asarray(proba_a)
+    proba_b = np.asarray(proba_b)
+    rng = np.random.default_rng(seed)
+
+    differences = []
+    for _ in range(n_bootstrap):
+        idx = rng.integers(0, len(y_true), len(y_true))
+        y_b = y_true[idx]
+        if y_b.min() == y_b.max():
+            continue
+        differences.append(metric(y_b, proba_a[idx]) - metric(y_b, proba_b[idx]))
+
+    return {
+        "difference": float(metric(y_true, proba_a) - metric(y_true, proba_b)),
+        "low": float(np.percentile(differences, 2.5)),
+        "high": float(np.percentile(differences, 97.5)),
+    }
+
+
 def evaluate_on_test(y_true, proba, threshold):
 
     point = test_metrics(y_true, proba, threshold)

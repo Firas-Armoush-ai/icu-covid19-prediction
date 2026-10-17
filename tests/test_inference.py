@@ -11,6 +11,7 @@ from app.utils.inference import (
     build_inference_dataframe,
     expand_lab_values,
 )
+from src.config import AGE_GROUPS as TRAINING_AGE_GROUPS
 from src.config import DATA_PATH, METADATA_PATH, PROJECT_ROOT
 
 EXPECTED = ["A", "B", "C"]
@@ -77,6 +78,11 @@ def import_frontend_utils(monkeypatch):
 
 def test_dashboard_uses_same_age_groups(monkeypatch):
     assert import_frontend_utils(monkeypatch).AGE_GROUPS == AGE_GROUPS
+
+
+def test_api_and_baseline_use_same_age_order():
+    # The baseline codes age groups 0-9 in this order.
+    assert TRAINING_AGE_GROUPS == AGE_GROUPS
 
 
 def test_dashboard_threshold_explanation(monkeypatch):

@@ -13,8 +13,10 @@ import joblib
 import numpy as np
 import pandas as pd
 import sklearn
+from sklearn.metrics import average_precision_score, brier_score_loss, roc_auc_score
 
 from .config import (
+    BASELINE_MODEL,
     FINAL_MODEL,
     METADATA_PATH,
     MODEL_PATH,
@@ -22,7 +24,7 @@ from .config import (
     RECALL_TARGET,
 )
 from .cross_validate import run_cv
-from .evaluate import TEST_METRICS, evaluate_on_test
+from .evaluate import TEST_METRICS, evaluate_on_test, paired_bootstrap_difference
 from .models import load_split, build_model
 from .plots import save_confusion_matrix, save_feature_importance, save_roc_curve
 from .threshold import threshold_table
@@ -59,7 +61,26 @@ def choose_threshold(X_train, y_train):
     }
 
 
-def write_test_report(test, cv_at_threshold, top_features):
+def baseline_on_test(X_train, y_train, X_test, y_test, proba):
+    """
+    Score the age-only baseline on the same test patients, for comparison.
+
+    This was added after the final model's test results had been seen, so it
+    checks the final model; it does not feed back into any choice.
+    """
+
+    baseline = build_model(BASELINE_MODEL).fit(X_train, y_train)
+    baseline_proba = baseline.predict_proba(X_test)[:, 1]
+
+    return {
+        "roc_auc": float(roc_auc_score(y_test, baseline_proba)),
+        "pr_auc": float(average_precision_score(y_test, baseline_proba)),
+        "brier": float(brier_score_loss(y_test, baseline_proba)),
+        "roc_auc_difference": paired_bootstrap_difference(y_test, proba, baseline_proba),
+    }
+
+
+def write_test_report(test, cv_at_threshold, top_features, baseline):
 
     m, ci = test["metrics"], test["ci95"]
     c = test["confusion"]
@@ -104,6 +125,24 @@ def write_test_report(test, cv_at_threshold, top_features):
         f"| **Not admitted** | {c['fp']} | {c['tn']} |",
         "",
         f"The model flags {m['flagged_share']:.0%} of test patients for ICU review.",
+        "",
+        "## Compared with an age-only baseline",
+        "",
+        f"The same test patients scored by `{BASELINE_MODEL}`: logistic regression on the age group "
+        "alone, trained on the same training split. This comparison was added after the final "
+        "model's test results had been seen, so it is a check on the final model, not a model choice; "
+        "the final model was not changed.",
+        "",
+        f"| Metric | Final model | {BASELINE_MODEL} |",
+        "| --- | --- | --- |",
+        f"| ROC-AUC | {m['roc_auc']:.3f} | {baseline['roc_auc']:.3f} |",
+        f"| PR-AUC | {m['pr_auc']:.3f} | {baseline['pr_auc']:.3f} |",
+        f"| Brier score | {m['brier']:.3f} | {baseline['brier']:.3f} |",
+        "",
+        f"ROC-AUC difference (final model minus baseline): "
+        f"{baseline['roc_auc_difference']['difference']:+.3f}, 95% interval "
+        f"{baseline['roc_auc_difference']['low']:+.3f} to {baseline['roc_auc_difference']['high']:+.3f} "
+        f"(paired bootstrap, {test['n_bootstrap']} resamples of the test patients).",
         "",
         "## Most important features",
         "",
@@ -185,6 +224,7 @@ def train_final():
         title=f"Test set at threshold {threshold:.3f}",
     )
     top_features = save_feature_importance(model, FIGURES_DIR / "fi_top20.png")
-    write_test_report(test, cv_at_threshold, top_features)
+    baseline = baseline_on_test(X_train, y_train, X_test, y_test, proba)
+    write_test_report(test, cv_at_threshold, top_features, baseline)
 
     return model, metadata

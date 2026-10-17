@@ -136,10 +136,37 @@
         "mean": 0.6030910579720623,
         "std": 0.06360059684734382
       }
+    },
+    "age_only": {
+      "roc_auc": {
+        "mean": 0.7010740281224153,
+        "std": 0.06551510379570354
+      },
+      "pr_auc": {
+        "mean": 0.653898746412982,
+        "std": 0.07509735274483753
+      },
+      "recall": {
+        "mean": 0.5723076923076923,
+        "std": 0.07190878307245227
+      },
+      "precision": {
+        "mean": 0.6165923010427824,
+        "std": 0.08940859120282726
+      },
+      "f1": {
+        "mean": 0.5906092017160177,
+        "std": 0.06596076938539591
+      }
     }
   },
   "highest_mean_roc_auc": "xgboost+sigmoid",
   "paired_comparison_roc_auc": {
+    "age_only": {
+      "mean_difference": 0.007775847808105878,
+      "std_difference": 0.06417726963633179,
+      "share_of_folds_reference_is_higher": 0.68
+    },
     "logistic": {
       "mean_difference": 0.028682795698924738,
       "std_difference": 0.05523111917373279,
@@ -165,6 +192,12 @@
       "std_difference": 0.02222057096583889,
       "share_of_folds_reference_is_higher": 0.74
     }
+  },
+  "baseline_model": "age_only",
+  "final_vs_baseline_roc_auc": {
+    "mean_difference": -0.006429693961952015,
+    "std_difference": 0.05874281709198754,
+    "share_of_folds_reference_is_higher": 0.54
   },
   "calibration": {
     "logistic": {
@@ -225,6 +258,16 @@
       "slope_std": 0.2491513785651248,
       "intercept_mean": 0.017191915221581568,
       "mean_predicted": 0.4662767198902757,
+      "observed_rate": 0.46099290780141844
+    },
+    "age_only": {
+      "brier_mean": 0.22069570535748922,
+      "brier_std": 0.0014759951439974849,
+      "brier_reference": 0.24847844675821135,
+      "slope_mean": 0.9506514070853871,
+      "slope_std": 0.03370752474778641,
+      "intercept_mean": -0.009689954230909261,
+      "mean_predicted": 0.4615759888857114,
       "observed_rate": 0.46099290780141844
     }
   },

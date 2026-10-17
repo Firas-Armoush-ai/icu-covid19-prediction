@@ -7,13 +7,17 @@
 import pandas as pd
 
 from sklearn.calibration import CalibratedClassifierCV
+from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import StratifiedKFold, train_test_split
 from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OrdinalEncoder
 from xgboost import XGBClassifier
 
 from .config import (
+    AGE_GROUPS,
+    BASELINE_MODEL,
     DATA_PATH,
     EVAL_METRIC,
     ID_COL,
@@ -63,6 +67,17 @@ CALIBRATION_SUFFIX = "+sigmoid"
 CANDIDATES = MODEL_NAMES + [name + CALIBRATION_SUFFIX for name in MODEL_NAMES]
 
 
+def build_baseline():
+    """Logistic regression on the age group alone, coded 0 (10th) to 9 (above 90th)."""
+
+    return Pipeline([
+        ("age", ColumnTransformer([
+            ("age_group", OrdinalEncoder(categories=[AGE_GROUPS]), ["AGE_PERCENTIL"]),
+        ])),
+        ("model", LogisticRegression(max_iter=MAX_ITER)),
+    ])
+
+
 def build_model(candidate):
     """
     Build a candidate such as "random_forest" or "random_forest+sigmoid".
@@ -72,6 +87,9 @@ def build_model(candidate):
     on 4/5 and learn a sigmoid mapping on the remaining 1/5. Predictions
     average the 5 calibrated pipelines.
     """
+
+    if candidate == BASELINE_MODEL:
+        return build_baseline()
 
     if candidate.endswith(CALIBRATION_SUFFIX):
         base = candidate[: -len(CALIBRATION_SUFFIX)]

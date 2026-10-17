@@ -63,16 +63,18 @@ class PatientData(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
         json_schema_extra={
+            # Patient 164 from the training split, first two hours
+            # (later admitted to ICU).
             "example": {
                 "AGE_PERCENTIL": "70th",
                 "GENDER": 0,
-                "HTN": 1,
+                "HTN": 0,
                 "IMMUNOCOMPROMISED": 0,
-                "ALBUMIN_MEDIAN": 0.263,
-                "BE_ARTERIAL_MEDIAN": -1.0,
-                "PCR_MEDIAN": -0.958,
-                "UREA_MEDIAN": -0.880,
-                "CREATININ_MEDIAN": -0.924,
+                "LINFOCITOS_MEDIAN": -0.803,
+                "PCR_MEDIAN": -0.791,
+                "PLATELETS_MEDIAN": -0.704,
+                "UREA_MEDIAN": -0.836,
+                "NEUTROPHILES_MEDIAN": -0.853,
             }
         },
     )
@@ -88,11 +90,13 @@ class PatientData(BaseModel):
     HTN: Optional[Literal[0, 1]] = Field(default=None, description="Hypertension (1 = yes)")
     IMMUNOCOMPROMISED: Optional[Literal[0, 1]] = Field(default=None, description="1 = yes")
 
-    ALBUMIN_MEDIAN: Optional[float] = scaled("Albumin, scaled -1 to 1")
-    BE_ARTERIAL_MEDIAN: Optional[float] = scaled("Arterial base excess, scaled -1 to 1")
+    # The five lab results the final model relies on most
+    # (reports/evaluation_test.md, "Most important features").
+    LINFOCITOS_MEDIAN: Optional[float] = scaled("Lymphocytes, scaled -1 to 1")
     PCR_MEDIAN: Optional[float] = scaled("C-reactive protein (PCR), scaled -1 to 1")
+    PLATELETS_MEDIAN: Optional[float] = scaled("Platelets, scaled -1 to 1")
     UREA_MEDIAN: Optional[float] = scaled("Urea, scaled -1 to 1")
-    CREATININ_MEDIAN: Optional[float] = scaled("Creatinine, scaled -1 to 1")
+    NEUTROPHILES_MEDIAN: Optional[float] = scaled("Neutrophils, scaled -1 to 1")
 
 
 # --------------------------------------------------
