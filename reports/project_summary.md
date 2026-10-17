@@ -15,6 +15,7 @@ Predict whether a confirmed COVID-19 patient will need ICU admission, using only
 * Fixed 80/20 stratified split: 282 training patients, 71 held-out test patients.
 * Logistic regression, random forest and XGBoost (library defaults), each with and without sigmoid calibration, compared by 5-fold × 10-repeat cross-validation on the training split, with all preprocessing refitted inside every fold.
 * Decision threshold set from out-of-fold predictions to reach 90% recall.
+* A one-feature baseline (logistic regression on age group alone) scored on the same folds and, afterwards, on the same test patients.
 * Final model and threshold committed before a single evaluation on the test set, with bootstrap intervals.
 
 ## Results
@@ -23,15 +24,18 @@ Predict whether a confirmed COVID-19 patient will need ICU admission, using only
 * Final model: **calibrated random forest, threshold 0.352**.
 * Test set: ROC-AUC 0.643 (95% CI 0.502–0.765); at the threshold, recall 0.818 (27 of 33), precision 0.519, specificity 0.342.
 * Most-used features: age, gender, lymphocytes, C-reactive protein, platelets, urea, neutrophils.
+* **Age alone does as well:** the age-only baseline reaches ROC-AUC 0.701 in cross-validation (final model 0.695) and 0.723 on the test set (difference −0.080, 95% CI −0.228 to +0.055).
 
 ## Takeaways
 
 * Fixing the 0–2 hour leakage and evaluating properly lowered the headline numbers, and made them trustworthy.
-* Early data supports a cautious screen (rule out about a third of patients who will not need ICU), not a confident predictor.
+* Early data supports a cautious screen (rule out about a third of patients who will not need ICU), not a confident predictor, and most of its signal is age.
+* A trivial baseline is the first thing to check: it showed that the labs add little in the first two hours.
 * Probability calibration matters as much as discrimination when a dashboard shows probabilities.
 
 ## Possible next steps
 
+* Any new model has to beat the age-only baseline.
 * Validate on data from another hospital or a later period.
 * Reduce the redundant lab columns (at 0–2 hours each lab's MEAN, MEDIAN, MIN and MAX are identical) and test a regularised logistic model with nested cross-validation.
 * Use later time windows for a separate, later-stage prediction task.

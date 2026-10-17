@@ -31,6 +31,18 @@ Recall, precision, specificity and F1 are at the decision threshold. Cross-valid
 
 The model flags 73% of test patients for ICU review.
 
+## Compared with an age-only baseline
+
+The same test patients scored by `age_only`: logistic regression on the age group alone, trained on the same training split. This comparison was added after the final model's test results had been seen, so it is a check on the final model, not a model choice; the final model was not changed.
+
+| Metric | Final model | age_only |
+| --- | --- | --- |
+| ROC-AUC | 0.643 | 0.723 |
+| PR-AUC | 0.592 | 0.664 |
+| Brier score | 0.236 | 0.214 |
+
+ROC-AUC difference (final model minus baseline): -0.080, 95% interval -0.228 to +0.055 (paired bootstrap, 2000 resamples of the test patients).
+
 ## Most important features
 
 Impurity-based importances from the random forests inside the calibrated model, averaged, summed per measurement (one-hot columns and the identical MEAN/MEDIAN/MIN/MAX copies of each lab combined). They show what the model relies on, not causal effects.

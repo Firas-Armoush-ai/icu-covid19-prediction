@@ -137,7 +137,7 @@ Each model uses library defaults (no hyperparameter tuning) and is evaluated bot
 ### Evaluation design
 
 1. **Fixed hold-out split.** 80/20 stratified split: 282 training patients (130 ICU), 71 test patients (33 ICU). The test set is not used until the very end.
-2. **Model comparison on the training split only.** Repeated stratified 5-fold cross-validation, 10 repeats (50 folds). Every fold refits the whole pipeline, including imputation, scaling, encoding, the missing-column filter and calibration, so nothing is learned from validation rows. Script: `python -m src.cross_validate`; full report: [`reports/cv_report.md`](reports/cv_report.md).
+2. **Model comparison on the training split only.** Repeated stratified 5-fold cross-validation, 10 repeats (50 folds). Every fold refits the whole pipeline, including imputation, scaling, encoding, the missing-column filter and calibration, so nothing is learned from validation rows. The same folds also score a one-feature baseline (logistic regression on age group alone), to show what the other features add. Script: `python -m src.cross_validate`; full report: [`reports/cv_report.md`](reports/cv_report.md).
 3. **Decision threshold from a recall target.** Missed ICU cases matter most, so the threshold is the highest one that reaches **90% recall** on out-of-fold predictions (chosen per CV repeat; median used): **0.352**.
 4. **Calibration check.** Brier score, calibration slope and reliability curves on out-of-fold predictions.
 5. **One test-set evaluation.** The final model and threshold were committed before the test set was used, then evaluated once, with 95% bootstrap intervals. Script: `python run.py`; report: [`reports/evaluation_test.md`](reports/evaluation_test.md).
@@ -156,9 +156,11 @@ Each model uses library defaults (no hyperparameter tuning) and is evaluated bot
 | logistic+sigmoid | 0.667 ± 0.083 | 0.653 ± 0.086 | 0.236 ± 0.003 | 1.14 ± 0.32 |
 | **random_forest+sigmoid** (final) | 0.695 ± 0.064 | 0.627 ± 0.073 | 0.225 ± 0.004 | 1.17 ± 0.22 |
 | xgboost+sigmoid | 0.709 ± 0.067 | 0.661 ± 0.078 | 0.222 ± 0.004 | 1.32 ± 0.25 |
+| *age_only (baseline: age group alone)* | 0.701 ± 0.066 | 0.654 ± 0.075 | 0.221 ± 0.001 | 0.95 ± 0.03 |
 
 * **Discrimination is similar across models.** The differences in ROC-AUC are smaller than the fold-to-fold spread.
 * **Uncalibrated models are badly overconfident.** Calibration slopes of 0.14–0.31 (ideal: 1), and Brier scores of 0.235–0.252, close to the 0.248 of always predicting the ICU rate. Sigmoid calibration brings the slopes to 1.14–1.32 and the Brier scores to 0.222–0.236.
+* **Age alone does as well.** Logistic regression on the age group alone reaches ROC-AUC 0.701 and the lowest Brier score (0.221). The final model is level with it (per-fold difference −0.006, SD 0.059, higher in 54% of folds): in the first two hours, the labs and comorbidities add no measurable discrimination beyond age.
 
 What the 90% recall target costs (final model, out-of-fold):
 
@@ -187,7 +189,9 @@ Flagging every patient would give precision 0.461.
 
 At the threshold the model caught **27 of 33** ICU patients, missed 6, and flagged 52 of 71 patients (73%). For reference, the Brier score of always predicting the test set's ICU rate is 0.249.
 
-**Reading these results:** the test results agree with cross-validation within their (wide) intervals, at the lower end. With 71 test patients, the ROC-AUC interval reaches down to about 0.5. Data from the first two hours carries limited signal: the model is useful as a cautious screen that rules out about a third of patients who will not need ICU, not as a confident predictor.
+**Reading these results:** the test results agree with cross-validation within their (wide) intervals, at the lower end. With 71 test patients, the ROC-AUC interval reaches down to about 0.5. Data from the first two hours carries limited signal, most of it in age: the model works as a cautious screen that rules out about a third of patients who will not need ICU, not as a confident predictor.
+
+**Against the age-only baseline.** On the same test patients the baseline scores ROC-AUC 0.723; the difference (final model minus baseline) is −0.080, with a 95% paired-bootstrap interval of −0.228 to +0.055. Neither is clearly better, which matches cross-validation. This comparison was added after the test results had been seen, so it is a check on the final model, not a reason to change it.
 
 > Earlier versions of this README reported a test ROC-AUC of 0.72 and recall of 0.82 at a 0.5 cut-off. Those figures came from a dataset that included 32 patients already in ICU during the 0–2 hour window (see [Final Modeling Dataset](#final-modeling-dataset)), and the model was chosen on the same test set it was scored on.
 
@@ -204,6 +208,8 @@ At the threshold the model caught **27 of 33** ICU patients, missed 6, and flagg
 
 Choosing among six candidates on the same cross-validation slightly flatters the winner; the single test-set evaluation is the unbiased check.
 
+The age-only baseline was added after the model had been chosen and tested. It matches the final model, so the choice among the six candidates matters less than the finding that the first two hours add little beyond age. The final model was kept as selected rather than swapped after seeing test results.
+
 ---
 
 ## Key Insights
@@ -218,7 +224,7 @@ What the model relies on most (impurity-based importances, summed per measuremen
 * Urea
 * Neutrophils
 
-These are associations the model uses, not causal effects; they are consistent with commonly reported markers of COVID-19 severity.
+These are associations the model uses, not causal effects; they are consistent with commonly reported markers of COVID-19 severity. Age dominates: on its own it does as well as the full model (see [Results](#results)).
 
 Three data findings shaped the work:
 
@@ -236,7 +242,7 @@ Three data findings shaped the work:
 * Fixed seeds throughout: re-running the pipeline reproduces the same model file byte for byte
 * Model saved to a fixed path (`models/icu_model.joblib`) with `models/model_metadata.json`: decision threshold, feature columns, cross-validation and test results, library versions
 * The API and dashboard read the threshold from that metadata, so labels always match the evaluated model
-* pytest tests (dataset build, preprocessing, threshold and calibration helpers, model loading, API contract), run by GitHub Actions on Python 3.12 and 3.13 for every push and pull request
+* pytest tests (dataset build, preprocessing, threshold and calibration helpers, age-only baseline, model loading, API contract including a check that every dashboard input changes the estimate), run by GitHub Actions on Python 3.12 and 3.13 for every push and pull request
 
 ---
 
@@ -399,13 +405,13 @@ python -m src.build_dataset
 ### Compare models (cross-validation)
 
 ```bash
-python -m src.cross_validate     # about 2 minutes; writes reports/cv_report.md
+python -m src.cross_validate     # a few minutes; writes reports/cv_report.md
 ```
 
 ### Train the final model and evaluate it on the test set
 
 ```bash
-python run.py                    # about 1 minute; writes models/ and reports/evaluation_test.md
+python run.py                    # a minute or two; writes models/ and reports/evaluation_test.md
 ```
 
 The final model and recall target are set in `src/config.py`. Seeds are fixed, so both commands reproduce the committed results.
@@ -473,7 +479,7 @@ This repository does not claim ownership of the dataset.
 
 * **Small sample.** 353 patients, with 71 in the test set, so test metrics have wide intervals (ROC-AUC 0.50–0.77).
 * **One hospital group, early 2020.** Hospital Sírio-Libanês sites in São Paulo and Brasília, 28 January – 16 April 2020: before vaccines, later variants and changes in treatment. Performance elsewhere or today is unknown.
-* **Modest signal in the first two hours.** At the 90% recall target the model still flags about three in four patients.
+* **Little signal beyond age in the first two hours.** An age-only baseline does as well as the final model, and at the 90% recall target the model still flags about three in four patients.
 * **Pre-scaled inputs.** The provider scaled every numeric value to −1 to 1 and did not publish the scaling, so the model cannot take raw clinical values (for example urea in mg/dL), and GENDER is a 0/1 code whose meaning is not documented.
 * **Demo inputs are partial.** The dashboard sets age group, gender, two comorbidity flags and the five most important lab values; the model's other inputs are filled with typical values from the training data.
 * **No vital signs.** About 70% of patients had none recorded in the first two hours, so the model drops them.
