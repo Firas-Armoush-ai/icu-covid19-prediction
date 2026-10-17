@@ -1,8 +1,0 @@
-# Training, evaluation and notebooks: the runtime packages plus these.
--r requirements.txt
-
-xgboost==3.2.0
-matplotlib==3.10.9
-seaborn==0.13.2
-missingno==0.5.2
-openpyxl==3.1.5

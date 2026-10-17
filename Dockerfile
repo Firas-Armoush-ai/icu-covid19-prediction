@@ -11,16 +11,13 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # ==========================================
-# Copy Requirements
+# Install runtime dependencies only (pyproject.toml, no extras).
+# Copied on its own first so this layer is cached between code changes.
 # ==========================================
 
-COPY requirements.txt .
+COPY pyproject.toml .
 
-# ==========================================
-# Install Dependencies
-# ==========================================
-
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir .
 
 # ==========================================
 # Copy Project Files: Copies repo into container.

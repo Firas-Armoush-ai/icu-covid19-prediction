@@ -364,9 +364,7 @@ icu-covid19-prediction/
 ├── tests/                       # pytest suite
 ├── .github/workflows/tests.yml  # CI
 ├── run.py                       # runs src/train.py
-├── requirements.txt             # runtime only (Docker)
-├── requirements-train.txt       # + training, plotting, notebooks
-├── requirements-dev.txt         # + pytest, httpx2
+├── pyproject.toml               # dependencies (runtime, train, dev) and pytest settings
 ├── Dockerfile
 ├── start.sh
 └── LICENSE
@@ -392,14 +390,16 @@ Tested with Python 3.13 (local) and 3.12 (Docker); CI runs both.
 ```bash
 conda create -n icu-covid19 python=3.13 -y
 conda activate icu-covid19
-pip install -r requirements-dev.txt
+pip install ".[dev]"
 ```
 
-Three requirement files, each building on the previous one:
+All dependencies are declared in `pyproject.toml`, in three layers:
 
-* `requirements.txt`: what the deployed app needs (the Docker image installs only this)
-* `requirements-train.txt`: adds XGBoost, plotting and notebook packages for training and evaluation
-* `requirements-dev.txt`: adds pytest
+* `pip install .`: what the deployed app needs (the Docker image installs only this)
+* `pip install ".[train]"`: adds XGBoost, plotting and notebook packages for training and evaluation
+* `pip install ".[dev]"`: adds pytest (and includes `train`)
+
+Installing adds the dependencies only; the code runs from the repository. Versions are pinned exactly because the saved model must load with the library versions it was trained with, and CI checks that they match.
 
 ### Rebuild the modelling dataset (optional)
 

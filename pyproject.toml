@@ -1,0 +1,60 @@
+# Dependencies and tool settings for the project, in one place.
+#
+#   pip install .            runtime only: what the Docker image installs
+#   pip install ".[train]"   + training, evaluation and notebooks
+#   pip install ".[dev]"     + tests (includes train)
+#
+# This is an application, not a library: installing it adds the dependencies
+# only, and the code runs from the repository. Versions are pinned exactly
+# because the saved model must load with the library versions it was trained
+# with (recorded in models/model_metadata.json; CI checks they match).
+
+[build-system]
+requires = ["hatchling==1.29.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "icu-covid19-prediction"
+version = "2.0.0"
+description = "Early ICU admission risk for COVID-19 patients: leakage-safe dataset, calibrated model, FastAPI and Streamlit"
+requires-python = ">=3.12"
+license = "MIT"
+authors = [{ name = "Firas Armoush" }]
+dependencies = [
+    "fastapi==0.136.1",
+    "uvicorn==0.46.0",
+    "streamlit==1.57.0",
+    "requests==2.34.2",
+    "numpy==2.4.4",
+    "pandas==3.0.3",
+    "scikit-learn==1.8.0",
+    "joblib==1.5.3",
+    "pydantic==2.13.4",
+]
+
+[project.optional-dependencies]
+train = [
+    "xgboost==3.2.0",
+    "matplotlib==3.10.9",
+    "seaborn==0.13.2",
+    "missingno==0.5.2",
+    "openpyxl==3.1.5",
+]
+dev = [
+    "icu-covid19-prediction[train]",
+    "pytest==9.1.1",
+    "httpx2==2.13.1",  # FastAPI's TestClient (Starlette 1.x) needs httpx2
+]
+
+[project.urls]
+Repository = "https://github.com/Firas-Armoush-ai/icu-covid19-prediction"
+"Live demo" = "https://icu-covid19-prediction.onrender.com/"
+
+# Install no files: the wheel carries only the dependency list.
+[tool.hatch.build.targets.wheel]
+bypass-selection = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra"
